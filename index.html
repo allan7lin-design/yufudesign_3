@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物流分流系統 V24.36 (含備份還原面板)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>    
+<style>
+        :root { --primary: #2563eb; --bg: #f3f4f6; --white: #ffffff; --border: #cbd5e1; }
+        
+        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #1f2937; height: 100vh; display: flex; flex-direction: column; font-size: 14px; }
+        
+        /* Navigation */
+        nav { background: #1e40af; padding: 10px 20px; display: flex; gap: 10px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow-x: auto; }
+        nav button { background: rgba(255,255,255,0.15); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold; transition: 0.2s; font-size: 14px; }
+        nav button:hover { background: rgba(255,255,255,0.3); }
+        nav button.active { background: white; color: #1e40af; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        
+        /* Backup Button Specific Style */
+        .btn-backup-nav { background: #059669 !important; } 
+        .btn-backup-nav:hover { background: #10b981 !important; }
+
+        .status-badge { margin-left: auto; color: white; font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 5px 10px; background: rgba(0,0,0,0.25); border-radius: 20px; border: 1px solid rgba(255,255,255,0.3); }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; }
+        .dot.ok { background: #10b981; box-shadow: 0 0 5px #10b981; }
+        .dot.loading { background: #f59e0b; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        /* Main Layout */
+        main { flex: 1; padding: 20px; overflow-y: auto; }
+        .view-section { display: none; animation: fadeIn 0.3s; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Dashboard & General */
+        .dashboard-panel { 
+            background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%); 
+            border: 1px solid #3b82f6; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.1);
+            display: flex; align-items: center; justify-content: space-between; gap: 15px;
+        }
+        .dash-stats { display: flex; gap: 15px; }
+        .stat-card { background: white; padding: 8px 15px; border-radius: 6px; border: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .stat-num { font-size: 20px; font-weight: 900; }
+        .stat-label { font-size: 13px; color: #555; font-weight: bold; }
+        .sc-blue { color: #1e40af; border-bottom: 3px solid #1e40af; }
+        .sc-orange { color: #c2410c; border-bottom: 3px solid #f97316; }
+        .sc-purple { color: #6b21a8; border-bottom: 3px solid #a855f7; }
+
+        /* Alert Banner */
+        .alert-banner {
+            display: none; /* Default Hidden */
+            background: #fef2f2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 15px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(239, 68, 68, 0.15);
+            animation: slideDown 0.3s ease-out;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .alert-banner.flex { display: flex; }
+        .alert-content { display: flex; align-items: center; gap: 10px; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Report List Styles */
+        .report-list-item {
+            padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 13px;
+        }
+        .report-list-item:last-child { border-bottom: none; }
+        .tag-mode { font-size: 11px; padding: 2px 6px; border-radius: 4px; color: white; margin-right: 5px; }
+        .tm-self { background: #2563eb; }
+        .tm-freight { background: #d97706; }
+        .tm-install { background: #7e22ce; }
+
+        /* Upcoming Schedule Panel */
+        .upcoming-panel { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .up-col { 
+            background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03); 
+            max-height: 250px; overflow-y: auto; 
+        }
+        .up-col h4 { margin: 0 0 10px 0; font-size: 14px; border-bottom: 2px solid #eee; padding-bottom: 5px; color: #374151; position: sticky; top: 0; background: white; z-index: 10; }
+        .up-item { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed #f3f4f6; position: relative; cursor: help; overflow: visible !important; }
+        .up-item:last-child { border-bottom: none; }
+        .up-date { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: bold; white-space: nowrap; }
+        .up-info { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #4b5563; flex: 1; }
+
+        .up-tooltip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background-color: #1f2937; color: #fff; padding: 10px 12px; border-radius: 6px; font-size: 12px; width: 240px; white-space: normal; z-index: 9999; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: left; line-height: 1.5; pointer-events: none; }
+        .up-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #1f2937 transparent transparent transparent; }
+        .up-item:hover .up-tooltip { display: block; }
+        .up-tooltip-title { font-weight: bold; color: #93c5fd; margin-bottom: 5px; display: block; border-bottom: 1px solid #374151; padding-bottom: 3px; }
+        .up-tooltip-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+
+        /* Dispatcher Grid */
+        .dispatcher-grid { display: grid; grid-template-columns: 480px 1fr; gap: 20px; height: calc(100vh - 280px); }
+        .pool-col { background: var(--white); border-radius: 8px; padding: 15px; overflow-y: auto; border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .target-col { display: grid; grid-template-rows: 1fr 1fr 1fr; gap: 15px; }
+
+        /* Search & Filters */
+        .search-box { background: #f0f9ff; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #bae6fd; }
+        .search-row { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
+        .search-row input[type="date"] { width: 110px; padding: 5px; font-size: 13px; border-radius: 4px; border: 1px solid #cbd5e1; }
+        .search-row input[type="text"] { flex: 1; padding: 6px; font-size: 13px; border: 1px solid #cbd5e1; border-radius: 4px; }
+        label { font-size: 13px; color: #334155; font-weight: bold; margin-bottom: 3px; display: block; }
+
+        /* Order Cards */
+        .order-group { border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 10px; overflow: hidden; position: relative; transition: 0.2s; }
+        .order-group.manual { border-color: #f59e0b; border-width: 2px; }
+        .order-group.is-hidden-order { border: 2px dashed #94a3b8; opacity: 0.8; background: #f1f5f9; }
+        .order-header { background: #e2e8f0; padding: 8px 10px; font-size: 13px; font-weight: bold; display: flex; flex-direction: column; gap:3px; cursor: pointer; color: #1e293b; }
+        .order-header:hover { background: #cbd5e1; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .header-info { font-size: 12px; color: #555; font-weight: normal; background: rgba(255,255,255,0.5); padding: 4px; border-radius: 4px; display:flex; gap:10px; flex-wrap:wrap; }
+        .order-actions { display:flex; gap:3px; }
+        .act-btn { padding:2px 6px; font-size:11px; cursor:pointer; border-radius:4px; border:1px solid #94a3b8; background:white; }
+        .act-del { color:#dc2626; border-color:#fca5a5; }
+
+        .order-items { padding: 5px; background: #f8fafc; }
+        .item-card { background: white; border: 1px solid #cbd5e1; padding: 6px 8px; border-radius: 4px; margin-bottom: 4px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; transition: 0.1s; }
+        .item-card:hover { border-color: var(--primary); background: #eff6ff; }
+        .item-card.selected { border: 1px solid var(--primary); background: #dbeafe; }
+        .item-card.disabled { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; opacity: 0.8; cursor: default; }
+        
+        .checkbox-mock { width: 16px; height: 16px; border: 1px solid #94a3b8; border-radius: 3px; display: inline-block; position: relative; flex-shrink: 0; background: white; }
+        .item-card.selected .checkbox-mock { background: var(--primary); border-color: var(--primary); }
+        .item-card.selected .checkbox-mock::after { content: '✔'; color: white; font-size: 12px; position: absolute; top: -1px; left: 2px; font-weight: bold; }
+
+        .item-controls { margin-left:auto; display:flex; gap:5px; }
+        .btn-icon-sm { border:none; background:transparent; cursor:pointer; font-size:14px; padding:2px; opacity:0.6; transition:0.2s; }
+        .btn-icon-sm:hover { opacity:1; transform:scale(1.1); }
+        .btn-icon-del:hover { color:red; }
+        .btn-icon-edit:hover { color:#2563eb; }
+
+        /* Drop Zones */
+        .drop-zone { border: 2px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.7); transition: 0.2s; position: relative; cursor: pointer; }
+        .drop-zone:hover { transform: scale(1.01); box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: var(--primary); }
+        .zone-self { background: #eff6ff; } .zone-self h3 { color: #1d4ed8; }
+        .zone-freight { background: #fff7ed; } .zone-freight h3 { color: #c2410c; }
+        .zone-install { background: #faf5ff; } .zone-install h3 { color: #7e22ce; }
+        .zone-btn { position: absolute; bottom: 10px; right: 10px; padding: 5px 12px; font-size: 12px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; }
+
+        /* Modal & Forms */
+        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid #e2e8f0; position: relative; }
+        .modal-full { max-width: 95%; height: 95vh; display: flex; flex-direction: column; padding: 0; }
+        .modal-large { max-width: 850px; width: 95%; } 
+        
+        .modal-header-bar { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-radius: 8px 8px 0 0; }
+        .modal-body { padding: 15px; overflow-y: auto; flex: 1; }
+        
+        .form-group { margin-bottom: 15px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box; background: #f8fafc; }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition:0.2s; font-size: 14px; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-cancel { background: #e5e7eb; color: #374151; margin-right: 10px; }
+        .btn-revert { background: #ef4444; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 10px; font-weight: bold; }
+        .btn-map { background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-map:hover { background: #2563eb; transform: translateY(-1px); }
+
+        /* Batch Input Table */
+        .batch-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .batch-table th { background: #f1f5f9; padding: 8px; text-align: left; border: 1px solid #e2e8f0; color: #475569; }
+        .batch-table td { padding: 5px; border: 1px solid #e2e8f0; }
+        .batch-table input { border: 1px solid #cbd5e1; padding: 6px; width: 100%; border-radius: 4px; }
+        .batch-table input:focus { border-color: var(--primary); outline: none; }
+        .btn-add-row { width: 100%; background: #ecfdf5; color: #047857; border: 1px dashed #10b981; padding: 8px; margin-top: 10px; cursor: pointer; border-radius: 6px; font-weight: bold; }
+        .btn-add-row:hover { background: #d1fae5; }
+        .row-del-btn { background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        /* Factory Card & Tooltip Styles */
+        .factory-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: 0.2s; position: relative; }
+        .factory-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .factory-header { padding: 10px; font-weight: bold; display: flex; justify-content: space-between; border-radius: 8px 8px 0 0; }
+        .factory-body { padding: 10px; }
+        .factory-tooltip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background-color: #1f2937; color: #fff; padding: 10px; border-radius: 6px; font-size: 12px; width: 260px; max-height: 300px; overflow-y: auto; z-index: 9999; box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: left; pointer-events: none; }
+        .factory-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: #1f2937 transparent transparent transparent; }
+        .factory-card:hover .factory-tooltip { display: block; }
+
+        /* Route Styles */
+        .route-text-flow { background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; }
+        .route-arrow { color: #94a3b8; margin: 0 5px; font-weight: bold; }
+        
+        /* Factory Detail Styles */
+        .fd-cust-header { background: #e0f2fe; color: #0369a1; padding: 8px 10px; border-radius: 6px; font-weight: bold; margin-top: 15px; margin-bottom: 5px; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 5px; }
+        .fd-cust-header:first-child { margin-top: 0; }
+        .fd-spacer { flex: 1; }
+        .btn-xs-batch { padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid; cursor: pointer; background: white; margin-left: 5px; }
+        .btn-xs-batch.batch-ret { border-color: #fca5a5; color: #dc2626; }
+        .btn-xs-batch.batch-ret:hover { background: #fef2f2; }
+        .btn-xs-batch.batch-mov { border-color: #fbbf24; color: #d97706; }
+        .btn-xs-batch.batch-mov:hover { background: #fffbeb; }
+
+        .fd-item-card { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; padding: 10px; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05); margin-left: 5px; border-left: 3px solid #cbd5e1; }
+        .fd-item-header { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: bold; color: #1e293b; }
+        .fd-spec { color: #64748b; font-size: 13px; margin-bottom: 5px; }
+        .fd-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .fd-btn { flex: 1; padding: 10px; border: 1px solid #ccc; background: white; border-radius: 4px; font-size: 14px; cursor: pointer; font-weight: bold; display: flex; justify-content: center; align-items: center; gap: 5px; }
+        .fd-btn.picked { border-color: #86efac; color: #166534; background: #f0fdf4; }
+        .fd-btn.picked:hover, .fd-btn.picked.active { background: #166534; color: white; }
+        .fd-btn.issue { border-color: #fca5a5; color: #991b1b; background: #fef2f2; }
+        .fd-btn.issue:hover { background: #991b1b; color: white; }
+
+        .task-card-done { opacity: 0.6; filter: grayscale(1); background: #f3f4f6 !important; }
+        .task-cust-title { font-weight: bold; font-size: 16px; color: #1e3a8a; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+
+        .exception-popup { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 20px; border-top: 2px solid #333; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); z-index: 2000; transform: translateY(100%); transition: 0.3s; }
+        .exception-popup.show { transform: translateY(0); }
+
+        /* Image Preview Styles */
+        .img-icon { cursor: pointer; color: #2563eb; font-size: 16px; vertical-align: middle; margin-left: 5px; }
+        .img-preview-box { max-width: 100%; max-height: 200px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; display: none; }
+        .img-preview-box.show { display: block; }
+        .paste-zone { border: 2px dashed #cbd5e1; padding: 15px; text-align: center; color: #64748b; margin-top: 10px; border-radius: 6px; cursor: pointer; }
+        .paste-zone:hover { background: #f8fafc; border-color: var(--primary); }
+
+        /* --- WORK ORDER (PRINT) STYLES --- */
+        .work-order-paper {
+            width: 210mm; /* A4 Width */
+            min-height: 297mm;
+            padding: 10mm;
+            background: white;
+            margin: 0 auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            color: black;
+            font-family: "Microsoft JhengHei", serif;
+            box-sizing: border-box;
+        }
+        .wo-title { text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 20px; border-bottom: 2px solid black; padding-bottom: 10px; }
+        .wo-header-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; border: 1px solid #000; padding: 10px; }
+        .wo-row { display: flex; margin-bottom: 5px; font-size: 15px; }
+        .wo-label { font-weight: bold; width: 80px; }
+        .wo-value { flex: 1; border-bottom: 1px dashed #999; }
+        
+        .wo-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        .wo-table th, .wo-table td { border: 1px solid black; padding: 8px; text-align: left; vertical-align: top; }
+        .wo-table th { background: #f0f0f0; text-align: center; font-weight: bold; }
+        
+        .wo-img-cell img { max-width: 150px; max-height: 150px; display: block; margin-top: 5px; }
+        .btn-upload-small { background: #e0f2fe; border: 1px dashed #0284c7; color: #0284c7; padding: 4px; font-size: 11px; cursor: pointer; text-align: center; display: inline-block; margin-top: 5px; width: 100px; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #workOrderModal, #workOrderModal * { visibility: visible; }
+            #workOrderModal { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; padding: 0; display: block !important; }
+            .modal-content { box-shadow: none; border: none; width: 100%; max-width: 100%; height: auto; padding: 0; margin: 0; overflow: visible; }
+            .work-order-paper { box-shadow: none; width: 100%; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+        }
+/* === 路徑規劃與手動排序樣式 === */
+        .route-container {
+            position: relative;
+            padding-left: 20px; /* 留給時間軸線 */
+            margin-top: 15px;
+        }
+        /* 垂直連接線 */
+        .route-container::before {
+            content: '';
+            position: absolute;
+            left: 14px;
+            top: 10px;
+            bottom: 10px;
+            width: 2px;
+            background: #cbd5e1;
+            z-index: 0;
+        }
+        
+        .route-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: grab; /* 手形游標 */
+        }
+        .route-card:hover {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-color: #94a3b8;
+        }
+        .route-card.dragging {
+            opacity: 0.5;
+            background: #f1f5f9;
+            border: 2px dashed #3b82f6;
+        }
+
+        /* 序號圓圈圖示 */
+        .route-icon-box {
+            width: 32px;
+            height: 32px;
+            background: #3b82f6;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            flex-shrink: 0;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .route-card:first-child .route-icon-box { background: #10b981; } /* 起點綠色 */
+        .route-card:last-child .route-icon-box { background: #ef4444; } /* 終點紅色 */
+
+        .route-info { flex: 1; }
+        .route-addr { font-weight: bold; font-size: 14px; color: #1e293b; }
+        .route-desc { font-size: 12px; color: #64748b; display:flex; gap:10px; }
+
+        /* 操作按鈕區 */
+        .route-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .btn-move {
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            color: #64748b;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+        .btn-move:hover { background: #e2e8f0; color: #0f172a; }
+
+        /* 拖曳時的 placeholder */
+        .sortable-placeholder {
+            border: 2px dashed #cbd5e1;
+            background: #f8fafc;
+            height: 60px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+/* === 地圖與排程分割視窗樣式 === */
+        .split-container { display: flex; gap: 20px; height: calc(100vh - 200px); }
+        
+        /* 左側列表區 */
+        .list-panel { flex: 1; overflow-y: auto; padding-right: 5px; min-width: 320px; }
+        
+        /* 右側地圖區 */
+        .map-panel { flex: 2; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; position: relative; }
+        #map-driver, #map-install { width: 100%; height: 100%; z-index: 1; }
+
+        /* 地圖上的序號標記 */
+/* 地圖上的序號標記 (修正版) */
+        .map-marker-icon {
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 50%;
+            border: 2px solid white;
+            /* 改用 Flexbox 確保數字絕對置中 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            
+            font-weight: bold;
+            font-size: 14px;
+            width: 30px !important;
+            height: 30px !important;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+            transition: transform 0.2s;
+        }
+        /* 滑鼠移過去稍微放大 */
+        .map-marker-icon:hover {
+            transform: scale(1.1);
+            z-index: 1000 !important;
+        }
+        
+        .marker-start { background-color: #10b981 !important; } /* 起點綠色 */
+        .marker-end { background-color: #ef4444 !important; }   /* 終點紅色 */
+        /* 讀取遮罩 */
+        .map-loading {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); z-index: 1000;
+            display: none; justify-content: center; align-items: center; flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <button class="active" onclick="switchView('dispatcher')">👨‍💻 KEY單者</button>
+    <button onclick="switchView('driver')">🚚 送貨員 (路徑)</button>
+    <button onclick="switchView('freight')">📦 貨運</button>
+    <button onclick="switchView('installer')">🔧 施工 (含導航)</button>
+    <button class="btn-backup-nav" onclick="openDataModal()">💾 資料備份/還原</button>
+    
+    <div class="status-badge" onclick="openConfig()">
+        <div id="cloudDot" class="dot"></div>
+        <span id="cloudText">未連線</span>
+        <span>⚙️</span>
+    </div>
+</nav>
+
+<main>
+    <div id="view-dispatcher" class="view-section active">
+        <div id="overdueAlert" class="alert-banner">
+            <div class="alert-content">
+                <span>🚨</span> 
+                <div>警告：偵測到 <b id="overdueCount" style="font-size:18px; text-decoration:underline;">0</b> 筆「今日或過期」的任務尚未完成！</div>
+            </div>
+            <button class="btn btn-sm" style="background:#dc2626; color:white; border:none;" onclick="openReportModal()">查看清單</button>
+        </div>
+
+        <div class="dashboard-panel">
+            <div class="dash-title">
+                ☀️ 今日工作 <span id="dashDate" style="font-size:14px; color:#666; font-weight:normal;"></span>
+                <button class="btn btn-sm" style="margin-left:10px; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;" onclick="openReportModal()">📊 今日/逾期報表</button>
+            </div>
+            <div class="dash-stats">
+                <div class="stat-card sc-blue"><span class="stat-label">🚚 自送</span><span class="stat-num" id="count-self">0</span></div>
+                <div class="stat-card sc-orange"><span class="stat-label">📦 貨運</span><span class="stat-num" id="count-freight">0</span></div>
+                <div class="stat-card sc-purple"><span class="stat-label">🔧 施工</span><span class="stat-num" id="count-install">0</span></div>
+            </div>
+        </div>
+        
+        <h4 style="margin: 0 0 10px 0; color: #4b5563;">📅 未來排程預覽 (捲動查看更多)</h4>
+        <div class="upcoming-panel">
+            <div class="up-col">
+                <h4 style="border-bottom-color: #93c5fd; color:#1e40af;">🚚 即將送貨</h4>
+                <div id="up-self"><div style="color:#999; font-size:12px;">無排程</div></div>
+            </div>
+            <div class="up-col">
+                <h4 style="border-bottom-color: #fdba74; color:#c2410c;">📦 即將貨運</h4>
+                <div id="up-freight"><div style="color:#999; font-size:12px;">無排程</div></div>
+            </div>
+            <div class="up-col">
+                <h4 style="border-bottom-color: #d8b4fe; color:#6b21a8;">🔧 即將施工</h4>
+                <div id="up-install"><div style="color:#999; font-size:12px;">無排程</div></div>
+            </div>
+        </div>
+
+        <div class="dispatcher-grid">
+            <div class="pool-col">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0; font-size:18px;">📦 訂單池</h3>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn btn-warning" style="padding:6px 12px; font-size:12px;" onclick="createManualOrder()">+ 臨時單</button>
+                        <button class="btn btn-primary" style="padding:6px 12px; font-size:12px;" onclick="syncCloud()">🔄 同步</button>
+                    </div>
+                </div>
+                
+                <div class="search-box">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                        <label style="margin:0;">🔍 篩選與狀態</label>
+                        <div style="font-size:12px;"><input type="checkbox" id="showHidden" onchange="renderPool()"> 顯示已隱藏</div>
+                    </div>
+                    <div class="search-row">
+                        <input type="date" id="filterStart" onchange="renderPool()">
+                        <span style="font-weight:bold; color:#666;">~</span>
+                        <input type="date" id="filterEnd" onchange="renderPool()">
+                        <button class="btn" style="background:#64748b; color:white; padding:5px 10px; font-size:12px;" onclick="clearFilters()">清除</button>
+                    </div>
+                    <div class="search-row">
+                        <input type="text" id="filterKeyword" placeholder="搜尋 客戶名稱 / 單號 ..." oninput="renderPool()">
+                    </div>
+                </div>
+
+                <div id="itemsPool"></div>
+                <div class="pool-footer">
+                    <div id="poolStats" style="font-size:12px; color:#666; text-align:center;"></div>
+                </div>
+            </div>
+
+            <div class="target-col">
+                <div class="drop-zone zone-self" onclick="openDispatchModal('self')">
+                    <h3>🚚 自送 (公司車)</h3>
+                    <p>指派工廠取貨 ➔ 送回公司 或 客戶</p>
+                    <button class="zone-btn">移入排程</button>
+                </div>
+                <div class="drop-zone zone-freight" onclick="openDispatchModal('freight')">
+                    <h3>📦 貨運 / 快遞</h3>
+                    <p>指派工廠取貨 ➔ 填寫貨運單</p>
+                    <button class="zone-btn">移入排程</button>
+                </div>
+                <div class="drop-zone zone-install" onclick="openDispatchModal('install')">
+                    <h3>🔧 施工 / 安裝</h3>
+                    <p>指派工班 ➔ 取貨 ➔ 施工</p>
+                    <button class="zone-btn">移入排程</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<div id="view-driver" class="view-section">
+        <div class="date-bar">
+            <label>📅 送貨日期：</label>
+            <input type="date" id="driverDate" onchange="renderDriverView()">
+        </div>
+        
+        <h3 style="margin:0 0 10px 0; color:#1e3a8a;">🏭 第一步：工廠取貨總表</h3>
+        <div id="driverPickupContent" class="pickup-container"></div>
+        <div class="section-divider"><span class="section-label">⬇️ 取貨後配送 (拖曳列表調整順序，右側地圖即時更新) ⬇️</span></div>
+        
+        <div class="split-container">
+            <div class="list-panel">
+                <div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <input type="text" id="routeStart" list="addressHistory" placeholder="出發地 (總公司)" value="總公司" style="flex:1;">
+                    <button class="btn-map" onclick="openGoogleMapsRoute('driver')">🗺️ 導航</button>
+                </div>
+                <div id="driverRouteTimeline" class="route-timeline"></div>
+            </div>
+            <div class="map-panel">
+                <div id="map-driver"></div>
+                <div id="loading-driver" class="map-loading">
+                    <div class="loading-spinner"></div>
+                    <span style="margin-top:10px; font-weight:bold; color:#555;">正在定位地址...</span>
+                </div>
+            </div>
+        </div>
+        <h3 style="margin:10px 0 10px 0; color:#1e3a8a;">📦 第三步：送貨單</h3>
+        <div id="driverContent"></div>
+    </div>
+
+    <div id="view-freight" class="view-section">
+        <div class="date-bar"><label>📅 叫件日期：</label><input type="date" id="freightDate" onchange="renderFreightView()"></div>
+        <h3 style="margin:0 0 10px 0; color:#c2410c;">🏭 取貨/叫件總表</h3>
+        <div id="freightPickupContent" class="pickup-container"></div>
+        <div class="section-divider"><span class="section-label">詳細清單</span></div>
+        <div id="freightContent"></div>
+    </div>
+
+    <div id="view-installer" class="view-section">
+        <div class="date-bar"><label>📅 施工日期：</label><input type="date" id="installDate" onchange="renderInstallView()"></div>
+        
+        <h3 style="margin:0 0 10px 0; color:#6b21a8;">🏭 第一步：領料/取貨總表</h3>
+        <div id="installPickupContent" class="pickup-container"></div>
+        
+        <div class="section-divider"><span class="section-label">⬇️ 施工路徑規劃 (拖曳列表調整順序，右側地圖即時更新) ⬇️</span></div>
+
+        <div class="split-container">
+            <div class="list-panel">
+                <div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <input type="text" id="installRouteStart" list="addressHistory" placeholder="出發地 (總公司)" value="總公司" style="flex:1;">
+                    <button class="btn-map" onclick="openGoogleMapsRoute('installer')">🗺️ 導航</button>
+                </div>
+                <div id="installRouteTimeline" class="route-timeline"></div>
+            </div>
+            <div class="map-panel">
+                <div id="map-install"></div>
+                <div id="loading-install" class="map-loading">
+                    <div class="loading-spinner"></div>
+                    <span style="margin-top:10px; font-weight:bold; color:#555;">正在定位地址...</span>
+                </div>
+            </div>
+        </div>
+        <h3 style="margin:10px 0 10px 0; color:#6b21a8;">🔧 第三步：施工任務清單</h3>
+        <div id="installContent"></div>
+    </div>
+</main>
+
+<div id="reportModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header-bar">
+            <h3>📊 今日與逾期工單概況</h3>
+            <button class="btn btn-cancel" onclick="document.getElementById('reportModal').style.display='none'">X</button>
+        </div>
+        <div class="modal-body" style="display:flex; gap:20px; flex-wrap: wrap;">
+            <div style="flex:1; min-width:300px; border-right:1px solid #eee; padding-right:10px;">
+                <h4 style="color:#dc2626; border-bottom:2px solid #fca5a5; padding-bottom:5px;">⚠️ 未完成 (今日+逾期)</h4>
+                <div id="listUnfinished" style="max-height:400px; overflow-y:auto;"></div>
+            </div>
+            <div style="flex:1; min-width:300px; padding-left:10px;">
+                <h4 style="color:#16a34a; border-bottom:2px solid #86efac; padding-bottom:5px;">✅ 今天已完成</h4>
+                <div id="listCompleted" style="max-height:400px; overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="dispatchModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle" style="font-size:18px; margin-top:0;">分派設定</h3>
+        <div id="selectedItemsSummary" style="background:#eff6ff; padding:10px; border-radius:6px; font-size:14px; margin-bottom:15px; color:#1e3a8a; border: 1px solid #bfdbfe;"></div>
+        <form onsubmit="event.preventDefault(); submitDispatch();">
+            <div class="form-group"><label>📅 執行日期</label><input type="date" id="modalDate" required></div>
+            <div class="form-group"><label>🏭 出貨工廠</label><input type="text" id="modalFactory" list="vendorList" placeholder="輸入或選擇..." required></div>
+            
+            <div id="field-installer" class="conditional-field" style="display:none;">
+                <div class="form-group"><label>👷 施工人員</label><input type="text" id="modalWorker" list="vendorList" placeholder="輸入或選擇..."></div>
+            </div>
+            
+            <div id="field-address" class="conditional-field">
+                <div class="form-group">
+                    <label id="lbl-address">📍 地址 (自動記憶)</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="modalAddress" list="addressHistory" placeholder="輸入地址..." required autocomplete="off">
+                        <button type="button" class="btn" style="background:#e2e8f0; font-size:12px; padding:8px 12px;" onclick="document.getElementById('modalAddress').value='總公司'">回公司</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="field-contact" class="conditional-field">
+                <div class="form-group"><label>👤 現場聯絡 (選填)</label><input type="text" id="modalContact"></div>
+                <div class="form-group"><label>📞 電話 (選填)</label><input type="text" id="modalPhone"></div>
+                <div class="form-group"><label>⏰ 時間 (選填)</label><input type="time" id="modalTime"></div>
+            </div>
+
+            <div class="form-group"><label>📝 任務備註</label><input type="text" id="modalNote"></div>
+            <div style="text-align:right; margin-top:20px;">
+                <button type="button" class="btn btn-cancel" onclick="closeModal()">取消</button>
+                <button type="submit" class="btn btn-primary">確認分派</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="editItemModal" class="modal">
+    <div class="modal-content">
+        <h3>✏️ 編輯訂單明細</h3>
+        <input type="hidden" id="edit_oid">
+        <input type="hidden" id="edit_idx">
+        <div class="form-group">
+            <label>品名</label>
+            <input type="text" id="edit_name" list="sharedProductList">
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <div style="flex:1"><label>長</label><input type="text" id="edit_len"></div>
+            <div style="flex:1"><label>寬</label><input type="text" id="edit_wid"></div>
+        </div>
+        <div class="form-group">
+            <label>數量</label>
+            <input type="number" id="edit_qty">
+        </div>
+        <div class="form-group">
+            <label>備註</label>
+            <input type="text" id="edit_note">
+        </div>
+        
+        <div class="form-group">
+            <label>圖片 / 截圖 (Ctrl+V)</label>
+            <div class="paste-zone" id="pasteZone" onclick="document.getElementById('edit_img_file').click()">
+                點擊上傳 或 直接貼上截圖 (Ctrl+V)
+                <br><span style="font-size:11px; color:#999;">(系統將自動壓縮圖片)</span>
+            </div>
+            <input type="file" id="edit_img_file" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+            <img id="edit_img_preview" class="img-preview-box">
+            <input type="hidden" id="edit_img_base64">
+            <button class="btn btn-revert" type="button" style="margin-top:5px;" onclick="clearImage()">清除圖片</button>
+        </div>
+
+        <div style="text-align:right; margin-top:15px;">
+            <button class="btn btn-cancel" onclick="document.getElementById('editItemModal').style.display='none'">取消</button>
+            <button class="btn btn-primary" onclick="saveEditedItem()">儲存修改</button>
+        </div>
+    </div>
+</div>
+
+<div id="batchInputModal" class="modal">
+    <div class="modal-content modal-large">
+        <h3 style="margin-top:0;">📝 廣告材質批次新增</h3>
+        <p style="font-size:13px; color:#666;">直接輸入品名、長寬，系統將自動組合規格。</p>
+        <input type="hidden" id="batch_orderId">
+        
+        <div style="max-height:60vh; overflow-y:auto; margin-bottom:15px;">
+            <table class="batch-table">
+                <thead>
+                    <tr>
+                        <th style="width:25%">品名 (可選/可輸)</th>
+                        <th style="width:12%">長</th>
+                        <th style="width:12%">寬</th>
+                        <th style="width:10%">數量</th>
+                        <th style="width:10%">單位</th>
+                        <th style="width:20%">備註</th>
+                        <th style="width:5%"></th>
+                    </tr>
+                </thead>
+                <tbody id="batchTableBody"></tbody>
+            </table>
+            <button class="btn-add-row" onclick="addBatchRow()">+ 新增一行</button>
+        </div>
+
+        <div style="text-align:right;">
+            <button class="btn btn-cancel" onclick="document.getElementById('batchInputModal').style.display='none'">取消</button>
+            <button class="btn btn-primary" onclick="submitBatchInput()">確認匯入</button>
+        </div>
+    </div>
+</div>
+
+<div id="configModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">☁️ 雲端設定</h3>
+        <input type="text" id="api_url_input" placeholder="Google Script URL..." style="width:100%; margin-bottom:20px;">
+        <div style="text-align:right;">
+            <button class="btn btn-cancel" onclick="document.getElementById('configModal').style.display='none'">取消</button>
+            <button class="btn btn-primary" onclick="saveConfig()">儲存</button>
+        </div>
+    </div>
+</div>
+
+<div id="dataModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">💾 資料備份與還原</h3>
+        <p style="color:#555; font-size:13px;">定期備份可防止網路異常導致資料流失。</p>
+        
+        <div style="background:#ecfdf5; padding:15px; border-radius:8px; border:1px solid #10b981; margin-bottom:20px; text-align:center;">
+            <h4 style="margin:0 0 10px 0; color:#047857;">步驟 1：備份 (下載)</h4>
+            <button class="btn" style="background:#059669; color:white; width:100%; font-size:15px;" onclick="backupData()">📥 下載 JSON 備份檔</button>
+        </div>
+
+        <div style="background:#fff1f2; padding:15px; border-radius:8px; border:1px solid #f43f5e; text-align:center;">
+            <h4 style="margin:0 0 10px 0; color:#be123c;">步驟 2：還原 (匯入)</h4>
+            <p style="font-size:12px; color:#be123c; margin-bottom:10px;">⚠️ 警告：還原將覆蓋目前所有資料！</p>
+            <button class="btn" style="background:#e11d48; color:white; width:100%; font-size:15px;" onclick="triggerRestore()">📤 選取備份檔還原</button>
+            <input type="file" id="restoreFile" style="display: none;" accept=".json" onchange="restoreData(this)">
+        </div>
+
+        <div style="text-align:right; margin-top:20px;">
+            <button class="btn btn-cancel" onclick="document.getElementById('dataModal').style.display='none'">關閉</button>
+        </div>
+    </div>
+</div>
+
+<div id="factoryDetailModal" class="modal">
+    <div class="modal-content modal-full">
+        <div class="modal-header-bar">
+            <div>
+                <h3 style="margin:0;" id="fdTitle">工廠名稱</h3>
+                <div style="font-size:12px; color:#666;" id="fdSubtitle">清點清單 (點擊已取會自動儲存)</div>
+            </div>
+            <button class="btn btn-cancel" onclick="closeFactoryModal()">❌ 關閉</button>
+        </div>
+        <div class="modal-body" id="fdBody"></div>
+    </div>
+</div>
+
+<div id="exceptionPopup" class="exception-popup">
+    <h3 style="margin-top:0;">⚠️ 處理未取貨/異常項目</h3>
+    <input type="hidden" id="ex_tid">
+    <input type="hidden" id="ex_uid">
+    <p>您將以下項目標記為 <span style="font-weight:bold; color:red;">未取/異常</span>，請選擇後續動作：</p>
+    <div id="exItemInfo" style="background:#f3f4f6; padding:10px; border-radius:4px; margin-bottom:15px; font-size:14px; font-weight:bold;"></div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn" style="flex:1; background:#ef4444; color:white;" onclick="processException('return')">↩️ 退回訂單池</button>
+        <button class="btn" style="flex:1; background:#f59e0b; color:white;" onclick="processException('delay')">📅 移至明日合併</button>
+    </div>
+    <div style="text-align:center; margin-top:10px;">
+        <button class="btn btn-cancel" onclick="closeExceptionPopup()" style="width:100%;">取消操作</button>
+    </div>
+</div>
+
+<div id="workOrderModal" class="modal">
+    <div class="work-order-paper">
+        <div class="wo-title">施工派工單</div>
+        <div class="wo-header-grid">
+            <div class="wo-row"><div class="wo-label">案名：</div><div class="wo-value" id="woCust"></div></div>
+            <div class="wo-row"><div class="wo-label">日期：</div><div class="wo-value" id="woDate"></div></div>
+            <div class="wo-row"><div class="wo-label">聯絡人：</div><div class="wo-value" id="woContact"></div></div>
+            <div class="wo-row"><div class="wo-label">電話：</div><div class="wo-value" id="woPhone"></div></div>
+            <div class="wo-row" style="grid-column:1/-1;"><div class="wo-label">地址：</div><div class="wo-value" id="woAddress"></div></div>
+            <div class="wo-row" style="grid-column:1/-1;"><div class="wo-label">施工人員：</div><div class="wo-value" id="woWorker"></div></div>
+        </div>
+
+        <table class="wo-table">
+            <thead>
+                <tr>
+                    <th style="width:5%">#</th>
+                    <th style="width:30%">施工項目</th>
+                    <th style="width:20%">規格/尺寸</th>
+                    <th style="width:45%">示意圖/說明 (若無圖可點擊上傳)</th>
+                </tr>
+            </thead>
+            <tbody id="woItemsBody"></tbody>
+        </table>
+
+        <div style="margin-top:20px;">
+            <strong>備註事項：</strong>
+            <div id="woNote" style="border:1px solid black; min-height:100px; padding:10px; margin-top:5px; font-size:15px;"></div>
+        </div>
+
+        <div class="no-print" style="margin-top:30px; text-align:center; display:flex; gap:10px; justify-content:center;">
+            <button class="btn btn-cancel" onclick="document.getElementById('workOrderModal').style.display='none'">關閉</button>
+            <button class="btn btn-primary" onclick="window.print()">🖨️ 列印 / 存為PDF</button>
+        </div>
+    </div>
+</div>
+
+<datalist id="vendorList"></datalist>
+<datalist id="addressHistory"></datalist>
+<datalist id="sharedProductList"></datalist>
+
+<script>
+    let API_URL = 'https://script.google.com/macros/s/AKfycby5XUwZ9Cs5_67KSCmdBSZkRlKoBPif6j4t9PpZzievIVjN7T6lry5AlTVD-N7OufdN/exec';
+    
+    let db = {
+        cloudOrders: [],   manualOrders: [],  logistics: [],
+        vendors: [],       hiddenOrders: [],  savedAddresses: []
+    };
+
+    let currentFactoryContext = { name: '', date: '', mode: '' };
+
+    let selectedItems = []; 
+    let currentMode = '';
+
+    const PRODUCT_CATALOG = [
+        "PP亮", "PP霧", "PVC霧", "PVC亮", "全透亮", "全透霧",
+        "半透亮", "半透霧", "雙透布", "單透布", "油畫布", "斜紋布",
+        "合成板", "強光板", "發泡板", "中空板", "無接縫", "壓克力",
+        "立體發光字", "霓虹燈字", "招牌燈箱", "壓克力燈箱"
+    ];
+
+    function initProductDatalist() {
+        const dl = document.getElementById('sharedProductList');
+        dl.innerHTML = PRODUCT_CATALOG.map(p => `<option value="${p}">`).join('');
+    }
+
+    function stringToColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        let color = '#';
+        for (let i = 0; i < 3; i++) {
+            let value = (hash >> (i * 8)) & 0xFF;
+            value = Math.floor((value + 180) / 2);
+            color += ('00' + value.toString(16)).substr(-2);
+        }
+        return color;
+    }
+    
+    function getContrastYIQ(hexcolor){
+        hexcolor = hexcolor.replace("#", "");
+        var r = parseInt(hexcolor.substr(0,2),16);
+        var g = parseInt(hexcolor.substr(2,2),16);
+        var b = parseInt(hexcolor.substr(4,2),16);
+        var yiq = ((r*299)+(g*587)+(b*114))/1000;
+        return (yiq >= 128) ? '#1f2937' : 'white';
+    }
+
+window.onload = function() {
+        // ★★★ 修正 1：防止 Edge 瀏覽器阻擋本地儲存導致當機 ★★★
+        try {
+            const savedUrl = localStorage.getItem('erp_api_url');
+            if(savedUrl) API_URL = savedUrl;
+        } catch(e) {
+            console.log("瀏覽器阻擋了本地儲存，改用預設網址");
+        }
+        
+        db = { cloudOrders: [], manualOrders: [], logistics: [], vendors: [], hiddenOrders: [], savedAddresses: [] };
+        const today = new Date().toISOString().split('T')[0];
+        document.querySelectorAll('input[type="date"]').forEach(el => el.value = today);
+        document.getElementById('dashDate').innerText = `(${today})`;
+        
+        document.getElementById('filterStart').value = '';
+        document.getElementById('filterEnd').value = '';
+
+        // Paste event for images
+        document.getElementById('pasteZone').addEventListener('paste', handlePasteImage);
+
+        initProductDatalist(); 
+        syncCloud(); 
+    };
+
+    // --- Core Logic ---
+    function clearFilters() {
+        document.getElementById('filterStart').value = '';
+        document.getElementById('filterEnd').value = '';
+        document.getElementById('filterKeyword').value = '';
+        renderPool();
+    }
+
+    function updateDashboard() {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // 1. 計算今日統計
+        const tasks = db.logistics.filter(t => t.date === today);
+        let counts = { self: 0, freight: 0, install: 0 };
+        tasks.forEach(t => { if(counts[t.mode] !== undefined) counts[t.mode]++; });
+        
+        document.getElementById('count-self').innerText = counts.self;
+        document.getElementById('count-freight').innerText = counts.freight;
+        document.getElementById('count-install').innerText = counts.install;
+        document.getElementById('dashDate').innerText = `(${today})`;
+
+        // 2. 🔴 逾期檢查邏輯
+        const overdueTasks = db.logistics.filter(t => {
+            return t.status !== 'done' && t.date <= today;
+        });
+
+        const alertBox = document.getElementById('overdueAlert');
+        const alertCount = document.getElementById('overdueCount');
+
+        if (overdueTasks.length > 0) {
+            alertBox.style.display = 'flex'; 
+            alertCount.innerText = overdueTasks.length;
+        } else {
+            alertBox.style.display = 'none'; 
+        }
+
+        renderUpcomingPanel();
+    }
+
+    function openReportModal() {
+        const today = new Date().toISOString().split('T')[0];
+        const unfinished = db.logistics.filter(t => t.status !== 'done' && t.date <= today).sort((a,b) => a.date.localeCompare(b.date));
+        const completed = db.logistics.filter(t => t.status === 'done' && t.date === today);
+
+        const renderList = (tasks) => {
+            if(tasks.length === 0) return '<div style="color:#999; text-align:center; padding:10px;">無資料</div>';
+            return tasks.map(t => {
+                const badgeClass = t.mode === 'self' ? 'tm-self' : (t.mode === 'freight' ? 'tm-freight' : 'tm-install');
+                const badgeText = t.mode === 'self' ? '自送' : (t.mode === 'freight' ? '貨運' : '施工');
+                const itemsCount = t.items.length;
+                const distinctCust = [...new Set(t.items.map(i=>i.cust))].join('/');
+                const loc = t.address || t.factory || '未指定地點';
+                
+                return `<div class="report-list-item">
+                    <div>
+                        <span class="tag-mode ${badgeClass}">${badgeText}</span>
+                        <span style="font-weight:bold;">${t.date}</span> ${distinctCust}
+                        <br><span style="color:#666; margin-left:5px;">📍 ${loc} (${itemsCount}件)</span>
+                    </div>
+                    ${t.status !== 'done' ? `<button class="btn btn-sm btn-success" onclick="completeTask(${t.id}); openReportModal();">完成</button>` : '<span style="color:green;">✅</span>'}
+                </div>`;
+            }).join('');
+        };
+
+        document.getElementById('listUnfinished').innerHTML = renderList(unfinished);
+        document.getElementById('listCompleted').innerHTML = renderList(completed);
+        document.getElementById('reportModal').style.display = 'flex';
+    }
+    
+   function renderUpcomingPanel() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const futureTasks = db.logistics.filter(t => t.date > todayStr);
+        futureTasks.sort((a,b) => a.date.localeCompare(b.date));
+        
+        const modes = { self: 'up-self', freight: 'up-freight', install: 'up-install' };
+        
+        Object.keys(modes).forEach(mode => {
+            const container = document.getElementById(modes[mode]);
+            const filtered = futureTasks.filter(t => t.mode === mode);
+            
+            if(filtered.length === 0) {
+                container.innerHTML = `<div style="color:#999; font-size:12px; padding:5px;">無排程</div>`;
+            } else {
+                container.innerHTML = filtered.map(t => {
+                    const distinctCusts = [...new Set(t.items.map(i => i.cust))];
+                    let info = distinctCusts.join(' / ') || '未指定客戶';
+                    
+                    const detailList = t.items.map(i => 
+                        `<div class="up-tooltip-row"><span>• ${i.name}</span><span style="color:#9ca3af; margin-left:10px;">${i.spec || ''}</span></div>`
+                    ).join('');
+
+                    const factoryInfo = t.factory ? `<div style="color:#fbbf24; margin-bottom:5px; font-weight:bold;">🏠 ${t.factory}</div>` : '';
+                    
+                    return `
+                    <div class="up-item">
+                        <div class="up-date">${t.date.slice(5)}</div>
+                        <div class="up-info">${info}</div>
+                        
+                        <div class="up-tooltip">
+                            ${factoryInfo}
+                            <span class="up-tooltip-title">${info}</span>
+                            ${detailList}
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        });
+    }
+
+    function editTaskItemNote(tid, uid){ 
+        const t = db.logistics.find(x => x.id == tid); 
+        if(!t) return; 
+        
+        if(uid) {
+            const i = t.items.find(x => x.uid == uid); 
+            if(!i) return; 
+            const n = prompt("修改備註:", i.note || ""); 
+            if(n !== null) { i.note = n; pushToCloud(); renderViews(); }
+        } else {
+            const n = prompt("修改任務備註:", t.note || ""); 
+            if(n !== null) { t.note = n; pushToCloud(); renderViews(); }
+        }
+    }
+
+    function returnToPool(tid,uid){ if(!confirm('⚠️ 退回訂單池？'))return; removeItemFromTask(tid, uid); renderViews(); renderPool(); updateDashboard(); }
+    
+    function removeItemFromTask(tid, uid) {
+        const idx = db.logistics.findIndex(t => t.id == tid);
+        if(idx === -1) return;
+        
+        const item = db.logistics[idx].items.find(i => i.uid === uid);
+        if(item) {
+             const originId = item.orderId; 
+             let originalOrder = db.manualOrders.find(o => o.id == originId);
+             if(!originalOrder) originalOrder = db.cloudOrders.find(o => o.id == originId);
+
+             if(originalOrder) {
+                 if(!originalOrder.items) originalOrder.items = [];
+                 originalOrder.items.push({ name: item.name, spec: item.spec, w: item.w, h: item.h, note: item.note, img: item.img }); 
+                 db.hiddenOrders = db.hiddenOrders.filter(hid => hid !== String(originId));
+             } else {
+                 db.manualOrders.unshift({
+                     id: originId || 'RESTORED-' + Date.now(),
+                     date: new Date().toISOString().split('T')[0],
+                     cust: item.cust || '還原訂單',
+                     items: [{ name: item.name, spec: item.spec, w: item.w, h: item.h, note: item.note, img: item.img }],
+                     isManual: true
+                 });
+             }
+             pushToCloud();
+        }
+
+        db.logistics[idx].items = db.logistics[idx].items.filter(i => i.uid !== uid);
+        if(db.logistics[idx].items.length === 0) db.logistics.splice(idx, 1);
+        pushToCloud();
+    }
+
+    function restoreOrder(id) { 
+        if(!confirm('還原？')) return; 
+        db.hiddenOrders = db.hiddenOrders.filter(x => x !== String(id)); 
+        pushToCloud(); 
+        renderPool(); 
+    }
+
+    async function syncCloud() {
+        setLoading(true);
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            if(data) {
+                db.cloudOrders = data.o || [];
+                db.logistics = data.l || [];
+                db.manualOrders = data.mo || [];
+                db.hiddenOrders = data.ho || [];
+                db.savedAddresses = data.addr || [];
+
+                if(data.p) { db.vendors = data.p.filter(p => p.type === 'v').map(p => p.name); updateVendorList(); }
+                updateAddressDatalist(); 
+                renderPool(); renderViews(); updateDashboard(); setLoading(false, true);
+            }
+        } catch(e) { setLoading(false, false); }
+    }
+
+async function pushToCloud() {
+        setLoading(true);
+        try {
+            // 建立專用的 payload，而不是讀取後再覆蓋
+            const payload = {
+                action: 'save_shipping',
+                logistics: db.logistics,
+                manualOrders: db.manualOrders,
+                hiddenOrders: db.hiddenOrders,
+                savedAddresses: db.savedAddresses
+            };
+
+            const res = await fetch(API_URL, { 
+                method: 'POST', 
+                mode: 'no-cors', 
+                headers: {'Content-Type':'application/json'}, 
+                body: JSON.stringify(payload)
+            });
+            
+            setLoading(false, true);
+            updateDashboard();
+        } catch(e) { 
+            console.error(e);
+            setLoading(false, false); 
+            alert('❌ 上傳失敗，請檢查網路'); 
+        }
+    }
+    function setLoading(isLoading, isOk) {
+        const dot = document.getElementById('cloudDot');
+        if(isLoading) dot.className='dot loading';
+        else { dot.className= isOk?'dot ok':'dot'; dot.style.background=isOk?'':'red'; document.getElementById('cloudText').innerText=isOk?'已連線':'斷線'; }
+    }
+
+    function updateVendorList() { document.getElementById('vendorList').innerHTML = db.vendors.map(v => `<option value="${v}">`).join(''); }
+    function checkAndSaveAddress(addr) { 
+        if (addr && addr.trim()!=='' && addr!=='總公司' && !db.savedAddresses.includes(addr)) { 
+            db.savedAddresses.push(addr); 
+            pushToCloud(); 
+            updateAddressDatalist(); 
+        } 
+    }
+    function updateAddressDatalist() { document.getElementById('addressHistory').innerHTML = db.savedAddresses.map(a => `<option value="${a}">`).join(''); }
+
+    function renderPool() {
+        const container = document.getElementById('itemsPool');
+        container.innerHTML = '';
+        selectedItems = [];
+        const dispatchedIds = new Set();
+        db.logistics.forEach(t => t.items.forEach(i => dispatchedIds.add(i.uid)));
+        let allOrders = [...db.manualOrders, ...db.cloudOrders];
+        const startDate = document.getElementById('filterStart').value;
+        const endDate = document.getElementById('filterEnd').value;
+        const keyword = document.getElementById('filterKeyword').value.toLowerCase();
+        const showHidden = document.getElementById('showHidden').checked;
+        let visibleCount = 0, hiddenCount = 0;
+
+        allOrders.forEach(order => {
+            let oDate = order.date ? order.date.replace(/\//g, '-') : '';
+            if (startDate && oDate < startDate) return;
+            if (endDate && oDate > endDate) return;
+            if (keyword && !String(order.id).toLowerCase().includes(keyword) && !String(order.cust).toLowerCase().includes(keyword)) return;
+            
+            const isHidden = db.hiddenOrders.includes(String(order.id));
+            if(isHidden) hiddenCount++;
+            if(isHidden && !showHidden) return;
+            if(!order.items || order.items.length === 0) return;
+            visibleCount++;
+
+            const isManual = String(order.id).startsWith('TEMP-') || String(order.id).startsWith('RET-');
+            const allDispatched = order.items.every((item, idx) => dispatchedIds.has(`${order.id}_${idx}`));
+            
+            let contactInfo = [];
+            if(order.contact) contactInfo.push(`👤 ${order.contact}`);
+            if(order.phone) contactInfo.push(`📞 ${order.phone}`);
+            if(order.address) contactInfo.push(`📍 ${order.address}`);
+
+            container.innerHTML += `
+            <div class="order-group ${isManual?'manual':''} ${isHidden?'is-hidden-order':''}" style="opacity:${allDispatched?0.7:1}">
+                <div class="order-header" onclick="toggleOrder('${order.id}')">
+                    <div class="header-top">
+                        <span>${isManual?'📝':'📄'} ${order.id} (${order.cust}) [${order.date}] ${isHidden?'(已隱藏)':''}</span>
+                        <div class="order-actions">
+                             ${isHidden ? `<button class="act-btn" onclick="event.stopPropagation(); restoreOrder('${order.id}')" style="color:green;border-color:green;">還原</button>` :
+                                `${!allDispatched ? '<button class="act-btn" style="background:#2563eb;color:white;border:none;">全選</button>' : ''}
+                                <button class="act-btn" onclick="event.stopPropagation(); openBatchInputModal('${order.id}')" title="批次新增">➕ 批次</button>
+                                <button class="act-btn act-del" onclick="event.stopPropagation(); deleteOrder('${order.id}')">隱藏</button>`}
+                        </div>
+                    </div>
+                    ${contactInfo.length > 0 ? `<div class="header-info">${contactInfo.join(' | ')}</div>` : ''}
+                </div>
+                <div class="order-items" style="display:${isHidden?'none':'block'}">
+${order.items.map((item, idx) => {
+    const uid = `${order.id}_${idx}`;
+    const isScheduled = dispatchedIds.has(uid);
+    const hasImg = !!item.img;
+    return `
+    <div class="item-card ${isScheduled ? 'disabled' : ''}" id="card-${uid}" 
+            onclick="${(isScheduled || isHidden) ? '' : `toggleItem('${order.id}', ${idx}, '${uid}')`}">
+        <div class="checkbox-mock"></div>
+        <div style="flex:1">
+            <div style="font-weight:bold; font-size:14px;">${item.name} 
+                ${hasImg ? `<span class="img-icon" onclick="event.stopPropagation(); showImage('${uid}', '${item.img}')" title="查看圖片">📷</span>` : ''}
+            </div>
+            <div style="font-size:13px; color:#666;">
+                ${item.spec||''} ${(item.w||item.h) ? `(${item.w||'?'}x${item.h||'?'})` : ''}
+            </div>
+            ${item.note?`<div style="font-size:12px; color:#dc2626; font-weight:bold;">⚠️ ${item.note}</div>`:''}
+        </div>
+        ${isScheduled ? '<span class="status-tag tag-scheduled">已排程</span>' : 
+        `<div class="item-controls" onclick="event.stopPropagation()">
+            <button class="btn-icon-sm btn-icon-edit" onclick="openEditItemModal('${order.id}', ${idx})">✏️</button>
+            <button class="btn-icon-sm btn-icon-del" onclick="deleteItemInPool('${order.id}', ${idx})">🗑️</button>
+        </div>` }
+    </div>
+    `; 
+}).join('')}
+            </div> </div> `; // 補上：結束 HTML 模板字串
+    }); // 補上：結束 forEach 迴圈
+    
+    document.getElementById('poolStats').innerText = `顯示 ${visibleCount} 筆 (隱藏 ${hiddenCount} 筆)`;
+    if(container.innerHTML === '') container.innerHTML = '<div style="text-align:center; padding:30px; color:#999; font-size:14px;">無符合條件的訂單</div>';
+}
+
+    function toggleItem(orderId, idx, uid) {
+        const card = document.getElementById(`card-${uid}`);
+        if(card.classList.contains('disabled')) return; 
+        const existingIdx = selectedItems.findIndex(x => x.uid === uid);
+        if(existingIdx >= 0) { selectedItems.splice(existingIdx, 1); card.classList.remove('selected'); } 
+        else {
+            let order = db.manualOrders.find(o => o.id == orderId) || db.cloudOrders.find(o => o.id == orderId);
+            const item = order.items[idx];
+            selectedItems.push({ 
+                uid: uid, orderId: orderId, cust: order.cust, 
+                name: item.name, spec: item.spec, w: item.w, h: item.h, note: item.note,
+                img: item.img // Pass image
+            });
+            card.classList.add('selected');
+        }
+        updateSummary();
+    }
+    function toggleOrder(orderId) {
+        if(db.hiddenOrders.includes(String(orderId))) return; 
+        const cards = document.querySelectorAll(`[id^="card-${orderId}_"]:not(.disabled)`);
+        if(cards.length === 0) return;
+        const allSelected = Array.from(cards).every(c => c.classList.contains('selected'));
+        cards.forEach(c => {
+            if(allSelected) { if(c.classList.contains('selected')) c.click(); }
+            else { if(!c.classList.contains('selected')) c.click(); }
+        });
+    }
+
+    function updateSummary() { document.getElementById('selectedItemsSummary').innerText = `已選取 ${selectedItems.length} 項`; }
+    
+    function createManualOrder() { 
+        const id = 'TEMP-' + Date.now(); 
+        db.manualOrders.unshift({ id: id, date: new Date().toISOString().split('T')[0], cust: '臨時出貨', address:'', contact:'', phone:'', items: [], isManual: true }); 
+        pushToCloud(); 
+        renderPool(); 
+        openBatchInputModal(id);
+    }
+    
+// ★★★ 修正 2：發送 delete_item 指令，強制雲端刪除 ★★★
+    function deleteOrder(id) { 
+        // 判斷是否為「臨時單」或「退回單」(只有這些是存在資料庫的 mo 欄位，需要真刪除)
+        if(id.startsWith('TEMP-') || id.startsWith('RET-')) { 
+            if(!confirm('確定要永久刪除此臨時單？')) return; 
+            
+            // 1. 本地移除 (讓畫面先變)
+            db.manualOrders = db.manualOrders.filter(o => o.id !== id); 
+            renderPool(); 
+
+            // 2. 發送專用刪除指令給雲端 (關鍵步驟！)
+            setLoading(true);
+            fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({
+                    action: 'delete_item',
+                    type: 'mo',  // mo 代表手動訂單 (Manual Orders)
+                    id: id
+                })
+            }).then(()=>{
+                setLoading(false, true);
+            }).catch(e => {
+                // 忽略錯誤，避免網路不穩時一直跳窗
+                setLoading(false, true);
+            });
+
+        } else { 
+            // 這是正式訂單，執行「隱藏」 (這部分維持原樣)
+            if(!confirm('確定要將此單隱藏？(可從篩選中找回)')) return; 
+            db.hiddenOrders.push(String(id)); 
+            pushToCloud(); 
+            renderPool(); 
+        } 
+    }    
+function deleteItemInPool(oid, idx) {
+    if(!confirm('確定要刪除此細項嗎？')) return;
+
+    let order = db.manualOrders.find(o => o.id == oid);
+    let isManual = true;
+
+    if(!order) { 
+        order = db.cloudOrders.find(o => o.id == oid); 
+        isManual = false; 
+    }
+
+    if(order && order.items[idx]) {
+        order.items.splice(idx, 1);
+
+        // 如果是手動單且項目已清空，刪除整張單
+        if(isManual && order.items.length === 0) {
+            db.manualOrders = db.manualOrders.filter(o => o.id !== oid);
+        }
+
+        if(isManual) {
+            pushToCloud(); 
+        }
+        renderPool();
+    }
+}
+
+    // === EDIT ITEM IN POOL (With Image) ===
+    function openEditItemModal(oid, idx) {
+        let order = db.manualOrders.find(o => o.id == oid) || db.cloudOrders.find(o => o.id == oid);
+        if(!order || !order.items[idx]) return;
+        
+        const item = order.items[idx];
+        document.getElementById('edit_oid').value = oid;
+        document.getElementById('edit_idx').value = idx;
+        document.getElementById('edit_name').value = item.name || '';
+        document.getElementById('edit_len').value = item.w || '';
+        document.getElementById('edit_wid').value = item.h || '';
+        document.getElementById('edit_qty').value = ''; 
+        document.getElementById('edit_note').value = item.note || '';
+        
+        const imgPrev = document.getElementById('edit_img_preview');
+        const imgHidden = document.getElementById('edit_img_base64');
+        if(item.img) {
+            imgPrev.src = item.img;
+            imgPrev.classList.add('show');
+            imgHidden.value = item.img;
+        } else {
+            clearImageUI();
+        }
+        
+        document.getElementById('editItemModal').style.display = 'flex';
+    }
+
+    function handleImageUpload(input) {
+        if(input.files && input.files[0]) {
+            processImageFile(input.files[0], (base64) => {
+                document.getElementById('edit_img_preview').src = base64;
+                document.getElementById('edit_img_preview').classList.add('show');
+                document.getElementById('edit_img_base64').value = base64;
+            });
+        }
+    }
+
+    function handlePasteImage(e) {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let index in items) {
+            const item = items[index];
+            if (item.kind === 'file' && item.type.indexOf('image/') !== -1) {
+                const blob = item.getAsFile();
+                processImageFile(blob, (base64) => {
+                    document.getElementById('edit_img_preview').src = base64;
+                    document.getElementById('edit_img_preview').classList.add('show');
+                    document.getElementById('edit_img_base64').value = base64;
+                });
+            }
+        }
+    }
+
+    function processImageFile(file, callback) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const MAX_WIDTH = 800;
+                const MAX_HEIGHT = 800;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                callback(dataUrl);
+            }
+        }
+        reader.readAsDataURL(file);
+    }
+
+    function clearImage() {
+        clearImageUI();
+        document.getElementById('edit_img_file').value = '';
+    }
+    
+    function clearImageUI() {
+        document.getElementById('edit_img_preview').src = '';
+        document.getElementById('edit_img_preview').classList.remove('show');
+        document.getElementById('edit_img_base64').value = '';
+    }
+
+    function showImage(uid, src) {
+        const w = window.open("", "_blank");
+        w.document.write(`<img src="${src}" style="max-width:100%;">`);
+    }
+
+    function saveEditedItem() {
+        const oid = document.getElementById('edit_oid').value;
+        const idx = document.getElementById('edit_idx').value;
+        let order = db.manualOrders.find(o => o.id == oid);
+        let isCloud = false;
+        if(!order) { order = db.cloudOrders.find(o => o.id == oid); isCloud = true; }
+        
+        if(order && order.items[idx]) {
+            const name = document.getElementById('edit_name').value;
+            const w = document.getElementById('edit_len').value;
+            const h = document.getElementById('edit_wid').value;
+            const qty = document.getElementById('edit_qty').value;
+            const note = document.getElementById('edit_note').value;
+            const img = document.getElementById('edit_img_base64').value;
+            
+            const sizeSpec = (w && h) ? `${w}x${h}` : (w || h || '');
+            const fullSpec = [sizeSpec, qty?`x${qty}`:''].filter(Boolean).join(' ');
+
+            order.items[idx].name = name;
+            order.items[idx].spec = fullSpec;
+            order.items[idx].w = w;
+            order.items[idx].h = h;
+            order.items[idx].note = note;
+            order.items[idx].img = img; 
+
+            if(!isCloud) pushToCloud(); 
+            document.getElementById('editItemModal').style.display = 'none';
+            renderPool();
+        }
+    }
+
+
+    // === NEW SMART BATCH INPUT ===
+    let batchRowCount = 0;
+
+    function openBatchInputModal(oid) {
+        document.getElementById('batch_orderId').value = oid;
+        document.getElementById('batchTableBody').innerHTML = ''; 
+        batchRowCount = 0;
+        addBatchRow();
+        addBatchRow();
+        addBatchRow();
+        document.getElementById('batchInputModal').style.display = 'flex';
+    }
+
+    function addBatchRow() {
+        batchRowCount++;
+        const tbody = document.getElementById('batchTableBody');
+        const tr = document.createElement('tr');
+        tr.id = `row-${batchRowCount}`;
+        
+        tr.innerHTML = `
+            <td>
+                <input type="text" id="name-${batchRowCount}" list="sharedProductList" placeholder="選擇或輸入...">
+            </td>
+            <td><input type="text" id="len-${batchRowCount}" placeholder="長" style="text-align:center;"></td>
+            <td><input type="text" id="wid-${batchRowCount}" placeholder="寬" style="text-align:center;"></td>
+            <td><input type="number" id="qty-${batchRowCount}" placeholder="1" style="text-align:center;"></td>
+            <td><input type="text" id="unit-${batchRowCount}" placeholder="式" style="text-align:center;"></td>
+            <td><input type="text" id="note-${batchRowCount}" placeholder="備註"></td>
+            <td style="text-align:center;"><div class="row-del-btn" onclick="removeBatchRow(${batchRowCount})">✕</div></td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function removeBatchRow(id) {
+        const row = document.getElementById(`row-${id}`);
+        if(row) row.remove();
+    }
+
+    function submitBatchInput() {
+        const oid = document.getElementById('batch_orderId').value;
+        let order = db.manualOrders.find(o=>o.id==oid);
+        let isCloud = false;
+        if(!order) { order = db.cloudOrders.find(o=>o.id==oid); isCloud=true; }
+        if(!order) return;
+
+        if(!order.items) order.items = [];
+
+        const rows = document.getElementById('batchTableBody').querySelectorAll('tr');
+        rows.forEach(row => {
+            const id = row.id.split('-')[1];
+            const name = document.getElementById(`name-${id}`).value;
+            const length = document.getElementById(`len-${id}`).value;
+            const width = document.getElementById(`wid-${id}`).value;
+            const qty = document.getElementById(`qty-${id}`).value;
+            const unit = document.getElementById(`unit-${id}`).value;
+            const note = document.getElementById(`note-${id}`).value;
+
+            if(name.trim()) {
+                const sizeSpec = (length && width) ? `${length}x${width}` : (length || width || '');
+                const fullSpec = [sizeSpec, qty?`x${qty}`:'', unit].filter(Boolean).join(' ');
+                const fullNote = note ? note : '';
+                
+                order.items.push({
+                    name: name,
+                    spec: fullSpec,
+                    note: fullNote,
+                    w: length, 
+                    h: width
+                });
+            }
+        });
+
+        if(!isCloud) pushToCloud(); 
+        document.getElementById('batchInputModal').style.display = 'none';
+        renderPool();
+    }
+    
+    function openDispatchModal(mode) {
+        if(selectedItems.length === 0) return alert('未選取');
+        
+        currentMode = mode; 
+        document.getElementById('dispatchModal').style.display = 'flex';
+        
+        document.querySelectorAll('.conditional-field').forEach(e => e.style.display = 'none');
+        
+        const firstItem = selectedItems[0];
+        let sourceOrder = db.manualOrders.find(o => o.id == firstItem.orderId) ||
+                          db.cloudOrders.find(o => o.id == firstItem.orderId);
+        
+        if (sourceOrder) {
+            document.getElementById('modalAddress').value = sourceOrder.address || '';
+            document.getElementById('modalContact').value = sourceOrder.contact || '';
+            document.getElementById('modalPhone').value = sourceOrder.phone || '';
+        } else {
+            document.getElementById('modalAddress').value = '';
+            document.getElementById('modalContact').value = '';
+            document.getElementById('modalPhone').value = '';
+        }
+
+        document.getElementById('field-address').style.display = 'block';
+        document.getElementById('field-contact').style.display = 'block';
+        
+        if(mode === 'install') {
+            document.getElementById('field-installer').style.display = 'block';
+            document.getElementById('lbl-address').innerText = "施工地點";
+        } else if (mode === 'self') {
+            document.getElementById('lbl-address').innerText = "送貨地址";
+        } else {
+            document.getElementById('lbl-address').innerText = "貨運地址";
+        }
+
+        document.getElementById('modalNote').value = '';
+        document.getElementById('modalWorker').value = '';
+    }
+
+    function closeModal() { document.getElementById('dispatchModal').style.display='none'; }
+    function submitDispatch() {
+        const newTask = {
+            id: Date.now(), date: document.getElementById('modalDate').value, mode: currentMode, items: [...selectedItems],
+            factory: document.getElementById('modalFactory').value, address: document.getElementById('modalAddress').value,
+            note: document.getElementById('modalNote').value, worker: document.getElementById('modalWorker').value,
+            contact: document.getElementById('modalContact').value, phone: document.getElementById('modalPhone').value, time: document.getElementById('modalTime').value,
+            status: 'pending' 
+        };
+        checkAndSaveAddress(newTask.address);
+        db.logistics.push(newTask); pushToCloud(); closeModal(); selectedItems=[]; renderPool(); renderViews();
+    }
+    function switchView(v) { document.querySelectorAll('.view-section').forEach(e=>e.classList.remove('active')); document.getElementById('view-'+v).classList.add('active'); document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); renderViews(); }
+    function renderViews() {
+        if(document.getElementById('view-dispatcher').classList.contains('active')) renderPool();
+        if(document.getElementById('view-driver').classList.contains('active')) renderDriverView();
+        if(document.getElementById('view-freight').classList.contains('active')) renderFreightView();
+        if(document.getElementById('view-installer').classList.contains('active')) renderInstallView();
+    }
+    function sortTasksByAddress(tasks) { return tasks.sort((a, b) => (a.address||'').localeCompare(b.address||'', 'zh-Hant')); }
+    
+    function renderDriverView() { 
+        const d = document.getElementById('driverDate').value; 
+        let tasks = db.logistics.filter(x => x.mode==='self' && x.date===d); 
+        tasks = sortTasksByAddress(tasks);
+        
+        document.getElementById('driverPickupContent').innerHTML = generatePickupSummary(tasks, 'self');
+        document.getElementById('driverRouteTimeline').innerHTML = generateRoutePlanner(tasks, 'routeStart');
+        document.getElementById('driverContent').innerHTML = generateTaskHTML(tasks, 'address'); 
+    }
+
+    function renderFreightView() { const d=document.getElementById('freightDate').value; const t=db.logistics.filter(x=>x.mode==='freight'&&x.date===d); document.getElementById('freightPickupContent').innerHTML=generatePickupSummary(t,'freight'); document.getElementById('freightContent').innerHTML=generateTaskHTML(t,'factory'); }
+    
+    function renderInstallView() { 
+        const d = document.getElementById('installDate').value; 
+        let tasks = db.logistics.filter(x => x.mode === 'install' && x.date === d); 
+        
+        tasks = sortTasksByAddress(tasks);
+
+        document.getElementById('installPickupContent').innerHTML = generatePickupSummary(tasks, 'install');
+        document.getElementById('installRouteTimeline').innerHTML = generateRoutePlanner(tasks, 'installRouteStart');
+        document.getElementById('installContent').innerHTML = generateTaskHTML(tasks, 'worker'); 
+    }
+    
+    // === WORK ORDER (PRINT) GENERATOR ===
+    let currentWorkOrderTaskId = null;
+
+    function openWorkOrder(taskId) {
+        currentWorkOrderTaskId = taskId;
+        const task = db.logistics.find(t => t.id === taskId);
+        if(!task) return;
+
+        // Populate Header
+        const distinctCusts = [...new Set(task.items.map(i => i.cust))].join(' / ');
+        document.getElementById('woCust').innerText = distinctCusts || '未指定';
+        document.getElementById('woDate').innerText = task.date;
+        document.getElementById('woContact').innerText = task.contact || '';
+        document.getElementById('woPhone').innerText = task.phone || '';
+        document.getElementById('woAddress').innerText = task.address || task.factory || '';
+        document.getElementById('woWorker').innerText = task.worker || '';
+        document.getElementById('woNote').innerText = task.note || '';
+
+        // Populate Items Table
+        const tbody = document.getElementById('woItemsBody');
+        tbody.innerHTML = '';
+        
+        task.items.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            
+            // Image Cell Content
+            let imgContent = '';
+            if (item.img) {
+                imgContent = `<div class="wo-img-cell">
+                    <img src="${item.img}">
+                    <label class="btn-upload-small">更換圖片<input type="file" style="display:none" onchange="uploadWorkOrderImg(this, '${task.id}', '${item.uid}')"></label>
+                </div>`;
+            } else {
+                imgContent = `<label class="btn-upload-small">➕ 上傳圖片<input type="file" style="display:none" onchange="uploadWorkOrderImg(this, '${task.id}', '${item.uid}')"></label>`;
+            }
+
+            tr.innerHTML = `
+                <td>${index + 1}</td>
+                <td>
+                    <div style="font-weight:bold;">${item.name}</div>
+                    <div style="font-size:12px;color:#666;">(${item.cust || ''})</div>
+                </td>
+                <td>${item.spec || ''}</td>
+                <td>${item.note ? `<div style="color:red;font-weight:bold;">註：${item.note}</div>` : ''}${imgContent}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('workOrderModal').style.display = 'block';
+    }
+
+    function uploadWorkOrderImg(input, taskId, itemUid) {
+        if(input.files && input.files[0]) {
+            processImageFile(input.files[0], (base64) => {
+                // Find and update data
+                const task = db.logistics.find(t => t.id == taskId);
+                if(task) {
+                    const item = task.items.find(i => i.uid == itemUid);
+                    if(item) {
+                        item.img = base64;
+                        pushToCloud();
+                        // Re-render modal to show image
+                        openWorkOrder(parseInt(taskId));
+                    }
+                }
+            });
+        }
+    }
+
+
+    function generatePickupSummary(tasks, m) { 
+        if(tasks.length === 0) return '<div style="color:#999;grid-column:1/-1;text-align:center;">無取貨任務</div>'; 
+        
+        const g = {}; 
+        tasks.forEach(t => { 
+            const f = t.factory || '未指定'; 
+            if(!g[f]) g[f] = []; 
+            g[f].push(t); 
+        }); 
+        
+        return Object.keys(g).sort().map(f => {
+            let total = g[f].reduce((a, b) => a + b.items.length, 0);
+            
+            let pickedCount = 0;
+            g[f].forEach(t => t.items.forEach(i => { if(i.picked) pickedCount++; }));
+
+            let previewHtml = g[f].map(t => {
+                return t.items.map(i => 
+                    `<div style="margin-bottom:2px; border-bottom:1px dashed #444; padding-bottom:2px;">
+                        <span style="color:#93c5fd;">[${i.cust || '?'}]</span> ${i.name} 
+                        ${i.picked ? '✅' : ''}
+                     </div>`
+                ).join('');
+            }).join('');
+
+            return `<div class="factory-card" onclick="openFactoryModal('${f}','${m}', '${tasks[0].date}')">
+                <div class="factory-tooltip">
+                    <div style="font-weight:bold; border-bottom:1px solid #555; margin-bottom:5px; padding-bottom:3px;">📋 ${f} - 明細預覽</div>
+                    ${previewHtml}
+                </div>
+                <div class="factory-header" style="background:${stringToColor(f)};color:${getContrastYIQ(stringToColor(f))}">
+                    <span>${f}</span><span>${pickedCount}/${total}件</span>
+                </div>
+                <div class="factory-body"><div style="font-size:12px;color:#666;text-align:center;">點擊進行清點 (按公司排序)</div></div>
+            </div>`;
+        }).join(''); 
+    }
+
+    function openFactoryModal(factoryName, mode, date) {
+        document.getElementById('fdTitle').innerText = factoryName;
+        currentFactoryContext = { name: factoryName, date: date, mode: mode };
+
+        const tasks = db.logistics.filter(t => t.date === date && (t.factory === factoryName) && t.mode === mode);
+        const groupedByCust = {};
+        
+        tasks.forEach(task => {
+            task.items.forEach(item => {
+                const cust = item.cust || '未指定客戶';
+                if (!groupedByCust[cust]) groupedByCust[cust] = [];
+                groupedByCust[cust].push({
+                    ...item,
+                    parentTaskId: task.id,
+                    contact: task.contact,
+                    phone: task.phone
+                });
+            });
+        });
+
+        let html = '';
+        const sortedCusts = Object.keys(groupedByCust).sort();
+
+        if(sortedCusts.length === 0) {
+            html = '<div style="padding:20px;text-align:center;">無資料</div>';
+        } else {
+            sortedCusts.forEach(cust => {
+                html += `<div class="fd-cust-header">
+                    <span>🏢 ${cust}</span>
+                    <div class="fd-spacer"></div>
+                    <button class="btn-xs-batch batch-ret" onclick="batchProcessCust('${cust}', 'return')">↩️ 全退</button>
+                    <button class="btn-xs-batch batch-mov" onclick="batchProcessCust('${cust}', 'delay')">📅 明日</button>
+                </div>`;
+                
+                groupedByCust[cust].forEach(item => {
+                    const hasImg = !!item.img;
+                    html += `
+                    <div class="fd-item-card" id="fd-item-${item.parentTaskId}-${item.uid}">
+                        <div class="fd-item-header">
+                            <span>${item.name} 
+                                ${hasImg ? `<span class="img-icon" onclick="event.stopPropagation(); showImage('${item.uid}', '${item.img}')">📷</span>` : ''}
+                            </span>
+                            <span>${item.spec||''}</span>
+                        </div>
+                        <div style="font-size:12px; color:#555;">單號: ${item.orderId || 'N/A'} ${item.contact ? `| 👤 ${item.contact}` : ''}</div>
+                        ${item.note ? `<div style="color:red; font-size:12px;">註: ${item.note}</div>` : ''}
+                        <div class="fd-actions">
+                            <button class="fd-btn ${item.picked ? 'picked active' : 'picked'}" onclick="markPicked(this, '${item.parentTaskId}', '${item.uid}')">✅ 已取</button>
+                            <button class="fd-btn issue" onclick="openExceptionPopup('${item.parentTaskId}', '${item.uid}', '${item.name}')">⚠️ 未取</button>
+                        </div>
+                    </div>`;
+                });
+            });
+        }
+        
+        document.getElementById('fdBody').innerHTML = html;
+        document.getElementById('factoryDetailModal').style.display='flex';
+    }
+
+    function markPicked(btn, taskId, itemUid) {
+        const isActive = btn.classList.toggle('active');
+        const task = db.logistics.find(t => t.id == taskId);
+        if(task) {
+            const item = task.items.find(i => i.uid == itemUid);
+            if(item) {
+                item.picked = isActive; 
+                pushToCloud();
+            }
+        }
+    }
+    
+    function batchProcessCust(custName, action) {
+        if(!confirm(`確定要將「${custName}」的所有項目 ${action==='return'?'退回訂單池':'移至明日'} 嗎？`)) return;
+
+        const { name: fName, date: fDate, mode: fMode } = currentFactoryContext;
+        const relevantTasks = db.logistics.filter(t => t.date === fDate && t.factory === fName && t.mode === fMode);
+        
+        let itemsToProcess = [];
+        relevantTasks.forEach(task => {
+            const custItems = task.items.filter(i => (i.cust || '未指定客戶') === custName);
+            custItems.forEach(item => {
+                itemsToProcess.push({ taskId: task.id, uid: item.uid, itemData: item });
+            });
+        });
+
+        if(itemsToProcess.length === 0) return alert('無項目可處理');
+
+        if(action === 'return') {
+            itemsToProcess.forEach(p => {
+                removeItemFromTask(p.taskId, p.uid); 
+            });
+        } else if (action === 'delay') {
+            let tomorrow = new Date(fDate);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const nextDate = tomorrow.toISOString().split('T')[0];
+            
+            itemsToProcess.forEach(p => {
+                const taskIdx = db.logistics.findIndex(t => t.id == p.taskId);
+                if(taskIdx === -1) return;
+                
+                const task = db.logistics[taskIdx];
+                const itemIdx = task.items.findIndex(i => i.uid == p.uid);
+                
+                if(itemIdx !== -1) {
+                    db.logistics.push({
+                        ...task,
+                        id: Date.now() + Math.random(),
+                        date: nextDate,
+                        items: [task.items[itemIdx]],
+                        status: 'pending'
+                    });
+                    
+                    task.items.splice(itemIdx, 1);
+                    if(task.items.length === 0) db.logistics.splice(taskIdx, 1);
+                }
+            });
+            pushToCloud();
+        }
+
+        closeFactoryModal();
+        renderViews();
+    }
+
+
+    function openExceptionPopup(tid, uid, name) {
+        document.getElementById('ex_tid').value = tid;
+        document.getElementById('ex_uid').value = uid;
+        document.getElementById('exItemInfo').innerText = name;
+        document.getElementById('exceptionPopup').classList.add('show');
+    }
+
+    function closeExceptionPopup() { document.getElementById('exceptionPopup').classList.remove('show'); }
+
+    function processException(action) {
+        const tid = document.getElementById('ex_tid').value;
+        const uid = document.getElementById('ex_uid').value;
+        const taskIdx = db.logistics.findIndex(t => t.id == tid);
+        
+        if (taskIdx === -1) return;
+
+        if (action === 'return') {
+            removeItemFromTask(tid, uid); 
+        } else if (action === 'delay') {
+            const task = db.logistics[taskIdx];
+            const itemIdx = task.items.findIndex(i => i.uid == uid);
+            if(itemIdx !== -1) {
+                const item = task.items[itemIdx];
+                let tomorrow = new Date(task.date);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const nextDate = tomorrow.toISOString().split('T')[0];
+                
+                db.logistics.push({
+                    ...task,
+                    id: Date.now(),
+                    date: nextDate,
+                    items: [item]
+                });
+                
+                task.items.splice(itemIdx, 1);
+                if(task.items.length === 0) db.logistics.splice(taskIdx, 1);
+                pushToCloud();
+            }
+        }
+        
+        closeExceptionPopup();
+        closeFactoryModal();
+        renderViews();
+    }
+
+    function closeFactoryModal(){ document.getElementById('factoryDetailModal').style.display='none'; }
+
+    // === 改良版：路徑規劃生成器 (支援拖曳與圖示) ===
+    function generateRoutePlanner(tasks, startInputId) { 
+        // 1. 取得不重複地址
+        const uniqueAddresses = [...new Set(tasks.map(t => t.address).filter(a => a && a.trim() !== ''))];
+        
+        const startPointInput = document.getElementById(startInputId);
+        const startPoint = (startPointInput ? startPointInput.value.trim() : '總公司') || '總公司';
+
+        if(uniqueAddresses.length === 0) return '<div style="padding:10px;color:#999;">⚠️ 此日期無有效的地址資料</div>'; 
+
+        // 2. 建立包含「起點」的列表
+        const allPoints = [startPoint, ...uniqueAddresses];
+        const listId = `route-list-${startInputId}`; // 產生唯一 ID 以區分送貨/施工
+
+        // 3. 生成 HTML
+        let html = `<div id="${listId}" class="route-container">`;
+        
+        allPoints.forEach((addr, index) => {
+            const isStart = index === 0;
+            // 找出該地址對應的客戶 (如果是起點則無)
+            let relatedClients = [];
+            if(!isStart) {
+                const matchTasks = tasks.filter(t => t.address === addr);
+                matchTasks.forEach(t => {
+                   t.items.forEach(i => relatedClients.push(i.cust));
+                });
+            }
+            const clientText = isStart ? '(出發)' : ([...new Set(relatedClients)].join('/') || '未知客戶');
+
+            html += `
+            <div class="route-card" draggable="true" data-addr="${addr}">
+                <div class="route-icon-box">${isStart ? '起' : index}</div>
+                <div class="route-info">
+                    <div class="route-addr">${addr}</div>
+                    <div class="route-desc">
+                        <span>${isStart ? '🏢' : '👤'} ${clientText}</span>
+                        ${!isStart ? '<span style="color:#f59e0b">📦</span>' : ''}
+                    </div>
+                </div>
+                <div class="route-actions">
+                    <button class="btn-move" onclick="moveRouteItem('${listId}', this, -1)" title="上移">▲</button>
+                    <button class="btn-move" onclick="moveRouteItem('${listId}', this, 1)" title="下移">▼</button>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+
+        // 4. 綁定拖曳事件 (延遲執行以確保 DOM 已建立)
+        setTimeout(() => initDragAndDrop(listId), 100);
+
+        return html;
+    }
+
+    // === 新增：初始化拖曳功能 ===
+    function initDragAndDrop(listId) {
+        const list = document.getElementById(listId);
+        if(!list) return;
+
+        let draggedItem = null;
+
+        list.querySelectorAll('.route-card').forEach(item => {
+            item.addEventListener('dragstart', function(e) {
+                draggedItem = item;
+                setTimeout(() => item.classList.add('dragging'), 0);
+            });
+
+            item.addEventListener('dragend', function() {
+                setTimeout(() => {
+                    item.classList.remove('dragging');
+                    draggedItem = null;
+                    recalcRouteIndices(listId); // 重新計算序號
+                }, 0);
+            });
+        });
+
+        list.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(list, e.clientY);
+            const draggable = document.querySelector('.dragging');
+            if (afterElement == null) {
+                list.appendChild(draggable);
+            } else {
+                list.insertBefore(draggable, afterElement);
+            }
+        });
+    }
+
+    // 輔助：計算拖曳位置
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.route-card:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // === 新增：按鈕上下移動功能 ===
+    function moveRouteItem(listId, btn, direction) {
+        const item = btn.closest('.route-card');
+        const list = document.getElementById(listId);
+        if (direction === -1 && item.previousElementSibling) {
+            list.insertBefore(item, item.previousElementSibling);
+        } else if (direction === 1 && item.nextElementSibling) {
+            list.insertBefore(item.nextElementSibling, item);
+        }
+        recalcRouteIndices(listId);
+    }
+
+    // === 新增：重新計算序號與顏色 ===
+    function recalcRouteIndices(listId) {
+        const list = document.getElementById(listId);
+        const items = list.querySelectorAll('.route-card');
+        items.forEach((item, index) => {
+            const icon = item.querySelector('.route-icon-box');
+            if(index === 0) {
+                icon.innerText = '起';
+                icon.style.background = '#10b981'; // 綠色
+            } else {
+                icon.innerText = index;
+                icon.style.background = (index === items.length - 1) ? '#ef4444' : '#3b82f6'; // 最後一個紅色，其他藍色
+            }
+        });
+    }
+
+    // === 修改版：開啟 Google Maps (讀取畫面上排序後的結果) ===
+    function openGoogleMapsRoute(viewMode) {
+        let listId = '';
+        
+        if(viewMode === 'driver') {
+            listId = 'route-list-routeStart';
+        } else if (viewMode === 'installer') {
+            listId = 'route-list-installRouteStart';
+        }
+
+        const listContainer = document.getElementById(listId);
+        if(!listContainer) return alert('請先產生路徑列表');
+
+        // 從 DOM 讀取目前排好的順序
+        const cards = listContainer.querySelectorAll('.route-card');
+        const addresses = Array.from(cards).map(card => card.getAttribute('data-addr'));
+
+        if(addresses.length < 2) return alert('地點不足，無法導航');
+
+        // 第一個是起點
+        const origin = encodeURIComponent(addresses[0]);
+        // 最後一個是終點
+        const destination = encodeURIComponent(addresses[addresses.length - 1]);
+        
+        let waypointsParam = '';
+        // 中間的是停靠點
+        if(addresses.length > 2) {
+            const midPoints = addresses.slice(1, addresses.length - 1);
+            waypointsParam = `&waypoints=${midPoints.map(addr => encodeURIComponent(addr)).join('|')}`;
+        }
+        
+        // 舊版 Google Maps 網址參數
+        // const mapUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=driving`;
+        
+        // 使用通用格式，通常相容性更好
+      const mapUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=driving`;
+        
+        window.open(mapUrl, '_blank');
+    }
+    
+    // === Task Generation (With Print Button) ===
+    function generateTaskHTML(tasks, gBy) { 
+        if(tasks.length === 0) return '<div style="color:#999;padding:20px;font-size:14px;">無任務</div>'; 
+        
+        const g = {}; 
+        tasks.forEach(t => { const k = t[gBy] || '未指定'; if(!g[k]) g[k] = []; g[k].push(t); }); 
+        
+        const hasSelection = selectedItems.length > 0;
+
+        return Object.keys(g).map(k => `
+            <div class="sub-task drop">
+                <div class="task-header-text">${k}</div>
+                ${g[k].map(t => {
+                    const distinctCusts = [...new Set(t.items.map(i => i.cust))];
+                    const custTitle = distinctCusts.join(' / ') || '未指定客戶';
+                    
+                    const appendBtn = hasSelection 
+                        ? `<button class="btn" style="width:100%; background:#8b5cf6; color:white; margin-bottom:10px; font-size:13px; box-shadow:0 2px 4px rgba(0,0,0,0.1);" onclick="appendSelectedToTask(${t.id})">➕ 將選取的 ${selectedItems.length} 筆追加至此單</button>` 
+                        : '';
+                    
+                    // Add Print Button for Installer Mode
+                    const printBtn = (t.mode === 'install') 
+                        ? `<button class="btn" style="float:right; background:#4b5563; color:white; padding:4px 8px; font-size:12px; margin-left:10px;" onclick="openWorkOrder(${t.id})">🖨️ 產生詳細工單</button>` 
+                        : '';
+
+                    return `
+                    <div class="task-card ${t.status==='done'?'task-card-done':''}" style="background:#f8fafc;padding:15px;border:2px solid #e2e8f0;border-radius:8px;margin-bottom:15px; position:relative;">
+                        <div style="margin-bottom:5px;">
+                            ${printBtn}
+                            <div class="task-cust-title" style="display:inline-block;">${custTitle}</div>
+                            <input type="date" value="${t.date}" onchange="updateTaskDate(${t.id}, this.value)" style="border:1px solid #ccc; font-size:12px; padding:2px; height:24px; vertical-align:middle; margin-left:5px;">
+                        </div>
+
+                        ${t.mode==='install'?`<div>👷 ${t.worker} ${t.time?`(${t.time})`:''}</div>`:''}
+                        ${t.factory?`<div>🏠 ${t.factory}</div>`:''}
+                        ${t.address?`<div>📍 ${t.address}</div>`:''}
+                        ${(t.contact||t.phone)?`<div style="font-size:13px; color:#4b5563;">📞 ${t.contact||''} ${t.phone||''}</div>`:''}
+                        
+                        ${appendBtn}
+
+                        <div style="background:#fff7ed;color:#c2410c;padding:5px;margin-top:5px; border-radius:4px;">
+                            <span style="cursor:pointer;" onclick="editTaskItemNote(${t.id})">📝 ${t.note || '無備註 (點此新增)'} <span style="font-size:10px; border:1px solid; padding:0 3px;">✏️</span></span>
+                        </div>
+                        
+                        <div style="margin-top:10px;">
+                            ${t.items.map(i=> {
+                                const hasImg = !!i.img;
+                                return `<div>• ${i.name} ${i.spec||''} 
+                                    ${hasImg ? `<span class="img-icon" onclick="showImage('${i.uid}', '${i.img}')">📷</span>` : ''}
+                                    <button class="btn-revert" onclick="returnToPool(${t.id},'${i.uid}')">↩️</button>
+                                </div>`;
+                            }).join('')}
+                        </div>
+
+                        <div style="margin-top:15px; border-top:1px dashed #ddd; padding-top:10px; text-align:right;">
+                            ${t.status !== 'done' ? 
+                                `<button class="btn btn-success" style="padding:5px 15px; font-size:13px;" onclick="completeTask(${t.id})">✅ 完成任務</button>` : 
+                                `<div style="display:flex; justify-content:flex-end; align-items:center; gap:10px;">
+                                    <span style="color:green; font-weight:bold;">已完成</span>
+                                    <button class="btn" style="background:#cbd5e1; font-size:12px; padding:4px 8px;" onclick="undoCompleteTask(${t.id})">↩️ 復原</button>
+                                 </div>`
+                            }
+                        </div>
+                    </div>
+                `}).join('')}
+            </div>`).join(''); 
+    }
+
+    function updateTaskDate(tid, newDate) {
+        if(!newDate) return;
+        const idx = db.logistics.findIndex(t => t.id === tid);
+        if(idx !== -1) {
+            db.logistics[idx].date = newDate;
+            pushToCloud();
+            renderViews();
+            updateDashboard();
+        }
+    }
+
+    function completeTask(tid) {
+        const t = db.logistics.find(x => x.id === tid);
+        if(t) { t.status = 'done'; pushToCloud(); renderViews(); updateDashboard(); }
+    }
+
+    function undoCompleteTask(tid) {
+        const t = db.logistics.find(x => x.id === tid);
+        if(t) { t.status = 'pending'; pushToCloud(); renderViews(); updateDashboard(); }
+    }
+
+    function appendSelectedToTask(tid) {
+        if(selectedItems.length === 0) return alert('請先回到 [KEY單者] 頁面選取要追加的項目！');
+        
+        const task = db.logistics.find(t => t.id === tid);
+        if(!task) return;
+
+        if(!confirm(`確定要將選取的 ${selectedItems.length} 筆訂單追加到\n「${task.address || task.factory || '此任務'}」嗎？`)) return;
+
+        task.items.push(...selectedItems);
+        selectedItems = [];
+        if(document.getElementById('selectedItemsSummary')) {
+            document.getElementById('selectedItemsSummary').innerText = '';
+        }
+        pushToCloud();
+        renderViews();
+        alert('✅ 追加成功！');
+    }
+
+function openGoogleMapsRoute(viewMode) {
+        let dateInputId = '';
+        let startInputId = ''; 
+        let modeFilter = '';
+
+        if(viewMode === 'driver') {
+            dateInputId = 'driverDate';
+            startInputId = 'routeStart';
+            modeFilter = 'self';
+        } else if (viewMode === 'installer') {
+            dateInputId = 'installDate';
+            startInputId = 'installRouteStart';
+            modeFilter = 'install';
+        }
+
+        if(!dateInputId) return;
+
+        const dateVal = document.getElementById(dateInputId).value;
+        if(!dateVal) return alert('請先選擇日期');
+
+        let tasks = db.logistics.filter(t => t.date === dateVal && t.mode === modeFilter && t.address && t.address.trim() !== '');
+        tasks = sortTasksByAddress(tasks);
+
+        if(tasks.length === 0) {
+            alert('該日期無有效的地址');
+            return;
+        }
+
+        // 取得目前畫面上的排序 (支援手動拖曳後的順序)
+        // 注意：這裡需要讀取 DOM 上的順序，而不是 db 的原始順序，才能反應手動調整的結果
+        let listId = (viewMode === 'driver') ? 'route-list-routeStart' : 'route-list-installRouteStart';
+        const listContainer = document.getElementById(listId);
+        
+        let addresses = [];
+        if (listContainer) {
+            // 如果畫面上有列表，依照畫面順序抓取地址
+            const cards = listContainer.querySelectorAll('.route-card');
+            addresses = Array.from(cards).map(card => card.getAttribute('data-addr'));
+        } else {
+            // 如果還沒生成列表，則使用預設排序
+            addresses = [...new Set(tasks.map(t => t.address.trim()))];
+        }
+
+        if(addresses.length === 0) return;
+
+        const startPointInput = document.getElementById(startInputId);
+        const startPoint = (startPointInput ? startPointInput.value.trim() : '總公司') || '總公司';
+        
+        // 修正後的變數編碼與網址格式
+        const origin = encodeURIComponent(startPoint);
+        const destination = encodeURIComponent(addresses[addresses.length - 1]);
+        
+        let waypointsParam = '';
+        if(addresses.length > 1) {
+            // 取中間點作為途經點
+            const midPoints = addresses.slice(0, addresses.length - 1);
+            waypointsParam = `&waypoints=${midPoints.map(addr => encodeURIComponent(addr)).join('|')}`;
+        }
+
+        // 使用正確的 Google Maps Universal Cross-Platform URL
+const mapUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=driving`;
+        
+        window.open(mapUrl, '_blank');
+    }
+
+    function openConfig() {
+        document.getElementById('configModal').style.display = 'flex';
+        document.getElementById('api_url_input').value = API_URL.includes('script.google') ? API_URL : '';
+    }
+
+    function saveConfig() {
+        const url = document.getElementById('api_url_input').value.trim();
+        if (!url) {
+            alert("請輸入有效的 Google Script 網址！");
+            return;
+        }
+        API_URL = url;
+        localStorage.setItem('erp_api_url', url); 
+        document.getElementById('configModal').style.display = 'none';
+        syncCloud(); 
+    }
+
+    // === 新增/移動：備份與還原功能 ===
+    function openDataModal() {
+        document.getElementById('dataModal').style.display = 'flex';
+    }
+
+    function backupData() {
+        // 建立資料備份檔
+        const dataStr = JSON.stringify(db);
+        const blob = new Blob([dataStr], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Logistics_Backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function triggerRestore() {
+        if(!confirm("⚠️ 警告：還原資料將會覆蓋目前所有尚未同步的資料。\n請確認您要執行此操作！")) return;
+        document.getElementById('restoreFile').click();
+    }
+
+    function restoreData(input) {
+        const file = input.files[0];
+        if(!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const loadedDb = JSON.parse(e.target.result);
+                
+                // 簡單驗證資料結構
+                if(loadedDb.logistics && Array.isArray(loadedDb.logistics) && Array.isArray(loadedDb.manualOrders)) {
+                    db = loadedDb;
+                    // 同步到雲端，確保資料一致
+                    pushToCloud(); 
+                    
+                    renderPool();
+                    renderViews();
+                    updateDashboard();
+                    alert("✅ 資料還原成功！已同步至雲端。");
+                    document.getElementById('dataModal').style.display = 'none';
+                } else {
+                    alert("❌ 檔案格式錯誤：這似乎不是本系統的備份檔。");
+                }
+            } catch(err) {
+                alert("❌ 還原失敗：" + err);
+            }
+        };
+        reader.readAsText(file);
+        input.value = ''; // 重置 input 以便下次能選同個檔案
+    }
+// === 地圖整合核心邏輯 (Leaflet + OpenStreetMap) ===
+    let maps = { driver: null, install: null };
+    let markers = { driver: [], install: [] };
+    let polylines = { driver: null, install: null };
+    let addrCache = {}; // 地址座標快取，避免重複查詢
+
+    // 1. 初始化地圖
+function initMap(type) {
+        const mapId = type === 'driver' ? 'map-driver' : 'map-install';
+        if (maps[type]) return; 
+
+        maps[type] = L.map(mapId).setView([25.0330, 121.5654], 12);
+        
+        // 使用 CartoDB Voyager (No Labels) - 極簡風格，幾乎只有輪廓
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(maps[type]);
+    }
+    // 2. 地址轉座標 (使用 Nominatim 免費 API)
+    async function getCoordinates(address) {
+        if (!address) return null;
+        address = address.trim();
+        if (address === '總公司' || address === '公司') address = '台北市'; // 請自行修改為貴公司真實地址
+
+        if (addrCache[address]) return addrCache[address]; // 讀取快取
+
+        try {
+            // 延遲 1 秒避免請求過快被封鎖
+            await new Promise(r => setTimeout(r, 800)); 
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (data && data.length > 0) {
+                const coords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                addrCache[address] = coords;
+                return coords;
+            }
+        } catch (e) {
+            console.error("Geocoding error:", e);
+        }
+        return null;
+    }
+
+    // 3. 繪製路徑圖
+async function drawMapRoute(listId, type) {
+        const listContainer = document.getElementById(listId);
+        if(!listContainer) return;
+
+        const loadingDiv = document.getElementById(type === 'driver' ? 'loading-driver' : 'loading-install');
+        loadingDiv.style.display = 'flex';
+
+        // 確保地圖已初始化
+        setTimeout(() => {
+             initMap(type);
+             maps[type].invalidateSize(); 
+        }, 100);
+
+        const cards = listContainer.querySelectorAll('.route-card');
+        const addresses = Array.from(cards).map(card => card.getAttribute('data-addr'));
+        
+        // 清除舊標記與線條
+        if (polylines[type]) maps[type].removeLayer(polylines[type]);
+        markers[type].forEach(m => maps[type].removeLayer(m));
+        markers[type] = [];
+
+        const latLngs = [];
+        const bounds = [];
+
+        for (let i = 0; i < addresses.length; i++) {
+            const addr = addresses[i];
+            const coords = await getCoordinates(addr);
+            
+            if (coords) {
+                latLngs.push(coords);
+                bounds.push(coords);
+
+                // 設定樣式 Class
+                let cssClass = 'map-marker-icon';
+                if (i === 0) cssClass += ' marker-start';
+                else if (i === addresses.length - 1) cssClass += ' marker-end';
+
+                // ★★★ 修正重點：樣式直接套用在 className，html 只放數字 ★★★
+                const icon = L.divIcon({
+                    className: cssClass,
+                    html: i === 0 ? '起' : i, 
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+
+                const marker = L.marker(coords, { icon: icon }).addTo(maps[type]);
+                marker.bindPopup(`<b>${i===0?'起點':`站點 ${i}`}</b><br>${addr}`);
+                markers[type].push(marker);
+            }
+        }
+                                  
+        if (latLngs.length > 1) {
+            polylines[type] = L.polyline(latLngs, { color: '#3b82f6', weight: 4, opacity: 0.7, dashArray: '5, 10' }).addTo(maps[type]);
+            maps[type].fitBounds(bounds, { padding: [50, 50] });
+        }
+
+        loadingDiv.style.display = 'none';
+    }
+
+    // === 修改後的渲染觸發 (整合地圖) ===
+    // 請找到原本的 renderDriverView 並在最後加入 drawMapRoute
+    const originalRenderDriverView = renderDriverView;
+    renderDriverView = function() {
+        // 執行原本的邏輯
+        const d = document.getElementById('driverDate').value; 
+        let tasks = db.logistics.filter(x => x.mode==='self' && x.date===d); 
+        tasks = sortTasksByAddress(tasks);
+        
+        document.getElementById('driverPickupContent').innerHTML = generatePickupSummary(tasks, 'self');
+        document.getElementById('driverRouteTimeline').innerHTML = generateRoutePlanner(tasks, 'routeStart');
+        document.getElementById('driverContent').innerHTML = generateTaskHTML(tasks, 'address');
+        
+        // ★★★ 新增：觸發地圖繪製 ★★★
+        drawMapRoute('route-list-routeStart', 'driver');
+    };
+
+    const originalRenderInstallView = renderInstallView;
+    renderInstallView = function() {
+        const d = document.getElementById('installDate').value; 
+        let tasks = db.logistics.filter(x => x.mode === 'install' && x.date === d); 
+        tasks = sortTasksByAddress(tasks);
+
+        document.getElementById('installPickupContent').innerHTML = generatePickupSummary(tasks, 'install');
+        document.getElementById('installRouteTimeline').innerHTML = generateRoutePlanner(tasks, 'installRouteStart');
+        document.getElementById('installContent').innerHTML = generateTaskHTML(tasks, 'worker'); 
+        
+        // ★★★ 新增：觸發地圖繪製 ★★★
+        drawMapRoute('route-list-installRouteStart', 'install');
+    };
+
+    // === 修改：拖曳結束後，自動更新地圖 ===
+    // 找到原本的 initDragAndDrop 函式，在 dragend 事件中加入重繪
+    const originalInitDragAndDrop = initDragAndDrop;
+    initDragAndDrop = function(listId) {
+        const list = document.getElementById(listId);
+        if(!list) return;
+        let draggedItem = null;
+
+        list.querySelectorAll('.route-card').forEach(item => {
+            item.addEventListener('dragstart', function(e) {
+                draggedItem = item;
+                setTimeout(() => item.classList.add('dragging'), 0);
+            });
+
+            item.addEventListener('dragend', function() {
+                setTimeout(() => {
+                    item.classList.remove('dragging');
+                    draggedItem = null;
+                    recalcRouteIndices(listId);
+                    
+                    // ★★★ 新增：拖曳放開後，重畫地圖連線 ★★★
+                    const type = listId.includes('install') ? 'install' : 'driver';
+                    drawMapRoute(listId, type);
+                    
+                }, 0);
+            });
+        });
+
+        // 加上按鈕移動的監聽 (若您有使用上移/下移按鈕)
+        window.updateMapAfterMove = function(listId) {
+             const type = listId.includes('install') ? 'install' : 'driver';
+             drawMapRoute(listId, type);
+        }
+
+        list.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(list, e.clientY);
+            const draggable = document.querySelector('.dragging');
+            if (afterElement == null) { list.appendChild(draggable); } 
+            else { list.insertBefore(draggable, afterElement); }
+        });
+    }
+
+    // 修改按鈕移動函式，加入回調
+    const originalMoveRouteItem = moveRouteItem;
+    moveRouteItem = function(listId, btn, direction) {
+        originalMoveRouteItem(listId, btn, direction); // 執行原本移動
+        window.updateMapAfterMove(listId); // 觸發重繪
+    }
+// === 地圖直接調整順序功能 ===
+    function adjustOrderOnMap(listId, currentIndex, direction) {
+        const list = document.getElementById(listId);
+        if(!list) return;
+
+        // 取得所有卡片
+        const cards = Array.from(list.querySelectorAll('.route-card'));
+        const targetCard = cards[currentIndex];
+        
+        // 交換位置
+        if (direction === -1 && targetCard.previousElementSibling) {
+            // 往前 (上移)
+            list.insertBefore(targetCard, targetCard.previousElementSibling);
+        } else if (direction === 1 && targetCard.nextElementSibling) {
+            // 往後 (下移)
+            list.insertBefore(targetCard.nextElementSibling, targetCard);
+        }
+
+        // 重新計算序號與重繪地圖
+        recalcRouteIndices(listId);
+        
+        // 判斷是哪一種地圖 (driver 或 install)
+        const type = listId.includes('install') ? 'install' : 'driver';
+        
+        // 稍微延遲一下讓 DOM 更新
+        setTimeout(() => {
+            drawMapRoute(listId, type);
+        }, 100);
+    }
+
+</script>
+</body>
+</html>
